@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 if [[ -z "${MOONSHOT_API_KEY:-}" ]]; then
   echo "skip: MOONSHOT_API_KEY 未设置"
   exit 0

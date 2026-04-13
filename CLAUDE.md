@@ -30,7 +30,7 @@
 
 ## 测试
 
-- **目录**：仅使用 [`tests/`](tests/)（勿使用 `test/`）。`tests/unit/` 为纯逻辑单测；`tests/integration/` 为对 `dist/index.js` 的子进程 CLI 测试（会读网络或写临时 `WEB_HOME`）。
+- **目录**：仅使用 [`tests/`](tests/)（原根目录 `test/` 已并入 [`tests/manual/`](tests/manual/)）。`tests/unit/` 为纯逻辑单测；`tests/integration/` 为对 `dist/index.js` 的子进程 CLI 测试（会读网络或写临时 `WEB_HOME`）；`tests/manual/` 为可逐项执行的 shell 脚本。
 - **环境**：Vitest 启动时会加载仓库根目录 [`.env.local`](.env.local)（若存在），便于集成测试继承密钥；**勿将** `.env.local` 提交到 git。
 - **隔离**：集成测试通过环境变量 **`WEB_HOME`** 指向临时目录，代替默认的 `~/.web`，避免污染本机配置。产品代码中 [`getConfigPaths()`](src/config/index.ts) 在设置了非空 `WEB_HOME` 时使用其绝对路径作为配置根目录。
 - **新功能**：新增或变更命令、CLI 参数、配置结构或 provider 行为时，必须在 `tests/` 下**新增或修改**对应用例，并保持 `npm test` 通过。
