@@ -8,7 +8,7 @@ import { toGlobalFlags } from "../global";
 import { requireOneOf } from "../validate";
 import { render } from "../../output/renderer";
 
-const FETCH_CHAR_LIMIT = 10_000;
+const FETCH_CHAR_LIMIT = 100_000;
 const WAIT_UNTIL_VALUES = ["load", "domcontentloaded", "networkidle"] as const;
 
 export function registerFetchCommand(program: Command): void {

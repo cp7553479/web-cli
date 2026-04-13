@@ -324,7 +324,7 @@ One or more URLs; returns extracted body content.
 
 **html2markdown:** often first in templates; local HTML→Markdown; no API key.
 
-**Long output:** if result exceeds 10,000 characters, full text is written under `.web/temp/*.md` and the terminal shows the path.
+**Long output:** if result exceeds 100,000 characters, full text is written under `.web/temp/*.md` and the terminal shows the path.
 
 Examples:
 
