@@ -79,7 +79,7 @@
 | **research** | 比 answer 更深、厂商提供的「研究」类 API | `web research` |
 
 
-每条子命令**只调用该能力在厂商文档中的端点**；`web research` **不会**在 CLI 内串联 `search`→`fetch`。扩展请求参数通过 `--vendor key=value`（可重复）传入；在 `search` / `answer` / `research` 上也可直接写未注册的 `--键名 值` 或 `--键名=值`（与 `--vendor` 合并，**同名键以 `--vendor` 为准**），**仅各厂商文档允许的白名单键**会进入 HTTP 请求体，其余静默忽略。统一 CLI 名：`--country`、`--site` / `--sites`、`--safesearch`（search）；厂商不支持对应字段时同样静默忽略。
+扩展请求参数通过 `--vendor key=value`（可重复）传入；在 `search` / `answer` / `research` 上也可直接写未注册的 `--键名 值` 或 `--键名=值`（与 `--vendor` 合并，**同名键以 `--vendor` 为准**），**仅各厂商文档允许的白名单键**会进入 HTTP 请求体，其余静默忽略。统一 CLI 名：`--country`、`--site` / `--sites`、`--safesearch`（search）；厂商不支持对应字段时同样静默忽略。
 
 **多 `--providers`**：仍是多次**独立**官方 API 调用，再在客户端合并结果（与单端点语义不同，见 [多源并发搜索](#多源并发搜索)）。
 
@@ -351,7 +351,7 @@ web fetch https://example.com/article --provider html2markdown-main
 web research "你想研究的问题"
 ```
 
-直接调用 `[research.account.*]` 链上各账号对应厂商的 **research** HTTP 端点（例如 Tavily `POST /research` 后轮询 `GET /research/{request_id}`；Perplexity `POST /chat/completions` 且默认 `sonar-deep-research` 模型）。**不会**在本地把 `web search` 与 `web fetch` 串起来。
+直接调用 `[research.account.*]` 链上各账号对应厂商的 **research** HTTP 端点（例如 Tavily `POST /research` 后轮询 `GET /research/{request_id}`；Perplexity `POST /chat/completions` 且默认 `sonar-deep-research` 模型）。
 
 
 | 选项                    | 说明                                                                              |

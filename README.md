@@ -79,7 +79,7 @@ This CLI addresses that by:
 | **research** | Deeper “research” class APIs from vendors     | `web research` |
 
 
-Each subcommand **only** calls endpoints documented for that capability; `web research` does **not** chain `web search` → `web fetch` inside the CLI. Extra body fields go through `--vendor key=value` (repeatable). On `search` / `answer` / `research` you may also pass unregistered `--name value` or `--name=value` (merged with `--vendor`; **same key: `--vendor` wins**). Only **allowlisted** keys per vendor are sent; others are ignored. Shared CLI names: `--country`, `--site` / `--sites`, `--safesearch` (search); unsupported fields are ignored per vendor.
+Extra body fields go through `--vendor key=value` (repeatable). On `search` / `answer` / `research` you may also pass unregistered `--name value` or `--name=value` (merged with `--vendor`; **same key: `--vendor` wins**). Only **allowlisted** keys per vendor are sent; others are ignored. Shared CLI names: `--country`, `--site` / `--sites`, `--safesearch` (search); unsupported fields are ignored per vendor.
 
 **Multiple `--providers`:** still **separate** official API calls per provider, then client-side merge (different semantics from a single endpoint; see [Multi-provider concurrency](#multi-provider-concurrency)).
 
@@ -343,7 +343,7 @@ web fetch https://example.com/article --provider html2markdown-main
 web research "your research question"
 ```
 
-Calls each account’s vendor **research** HTTP API (e.g. Tavily `POST /research` then poll `GET /research/{request_id}`; Perplexity `POST /chat/completions` with `sonar-deep-research` by default). **Does not** locally chain `web search` + `web fetch`.
+Calls each account’s vendor **research** HTTP API (e.g. Tavily `POST /research` then poll `GET /research/{request_id}`; Perplexity `POST /chat/completions` with `sonar-deep-research` by default).
 
 
 | Option                   | Purpose                                                                                           |
