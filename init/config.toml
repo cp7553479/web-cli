@@ -18,6 +18,7 @@
 #
 # 【与 .env】
 #   api_token = "{$XXX}" 对应 ~/.web/.env 中响应的环境变量。
+#   未写 enabled 时默认启用并解析占位符；enabled = false 时不解析、不要求变量非空。
 #
 # =============================================================================
 
@@ -61,7 +62,6 @@ enabled = true
 # [fetch] — 按 URL 抓取（各 [fetch.account.*] 按出现顺序尝试，*为内部识别的account id，与API无关）
 # -----------------------------------------------------------------------------
 
-
 [fetch]
 
 [fetch.account.jina-reader]
@@ -74,7 +74,6 @@ enabled = true
 # api_token = "{$FIRECRAWL_API_KEY}"
 # enabled = true
 
-# Tavily Extract：POST https://api.tavily.com/extract（与 search 共用 TAVILY_API_KEY）
 # [fetch.account.tavily-extract]
 # provider = "tavily"
 # api_token = "{$TAVILY_API_KEY}"
@@ -106,7 +105,6 @@ enabled = false
 
 [research]
 
-# Tavily：POST /research 后轮询 GET /research/{request_id}
 # [research.account.tavily-main]
 # provider = "tavily"
 # api_token = "{$TAVILY_API_KEY}"

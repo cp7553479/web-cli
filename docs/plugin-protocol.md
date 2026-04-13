@@ -24,7 +24,7 @@ provider = "tavily"
 api_token = "{$TAVILY_API_KEY}"
 ```
 
-`provider` 字段写**厂商名**，必须与某插件注册的 factory 名一致。`PluginHost` 根据当前能力段（search / fetch / answer / research）为每个启用的 **`(alias, account)`** 调用 factory 对应的 `createSearch` / `createFetch` / `createAnswer` / `createResearch`，得到 provider 实例；实例的 `id` 为 **alias**（与 orchestrator 查找一致）。
+`provider` 字段写**厂商名**，必须与某插件注册的 factory 名一致。`PluginHost` 根据当前能力段（search / fetch / answer / research）为每个启用的 **`(alias, account)`**（`enabled` 省略或为 `true` 时视为启用，仅 `enabled = false` 时跳过）调用 factory 对应的 `createSearch` / `createFetch` / `createAnswer` / `createResearch`，得到 provider 实例；实例的 `id` 为 **alias**（与 orchestrator 查找一致）。
 
 如果某厂商未提供当前能力段所需的子组件（如在 `[fetch]` 段配了 `provider = "duckduckgo"` 但 factory 没有 `createFetch`），该账号会被跳过。
 

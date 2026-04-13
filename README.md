@@ -87,6 +87,20 @@ Each subcommand **only** calls endpoints documented for that capability; `web re
 
 ## Install
 
+### From npm (published)
+
+The CLI is published on the public npm registry as `**@cp7553479/web-cli`**:
+
+- **Package:** [https://www.npmjs.com/package/@cp7553479/web-cli](https://www.npmjs.com/package/@cp7553479/web-cli)
+
+```bash
+npm install -g @cp7553479/web-cli
+```
+
+This installs the `web` binary globally.
+
+### From source (this repository)
+
 ```bash
 git clone <this-repo-url>
 cd web
@@ -124,7 +138,7 @@ This copies `init/config.toml` and `init/.env.example` from the repo into `~/.we
 Then:
 
 1. Edit `~/.web/.env` with your API keys. The default template enables Jina search and fetch; you need at least `**JINA_API_KEY**` (see links at the top of `init/config.toml` or `init/.env.example`). Add other vendors as needed.
-2. Edit `~/.web/config.toml`: uncomment `[*.account.*]` blocks you want and set `enabled = true`.
+2. Edit `~/.web/config.toml`: uncomment `[*.account.*]` blocks you want. Omitting `enabled` defaults to **on**; set `enabled = false` only to disable an account.
 
 **Interactive wizard:**
 
@@ -162,7 +176,7 @@ Optional **project overrides:**
 | `./.web/.env`        | Project env overrides global for same variable names.              |
 
 
-`**npm test`** integration tests run the CLI from the **repository root**, matching project-level `./.web` above; you need a working `~/.web` (and `./.web` if you use it). External smoke tests require `**WEB_RUN_JINA_SMOKE=1`** (Jina search) and `**WEB_RUN_FETCH_HTTP_SMOKE=1**` (`http` fetch); otherwise those cases are skipped.
+`**npm test`** integration tests run the CLI from the **repository root**, matching project-level `./.web` above; you need a working `~/.web` (and `./.web` if you use it). External smoke tests require `**WEB_RUN_JINA_SMOKE=1`** (Jina search) and `**WEB_RUN_FETCH_HTTP_SMOKE=1`** (`http` fetch); otherwise those cases are skipped.
 
 > For line-by-line template commentary, open `init/config.toml` and `init/.env.example` in the repo (detailed Chinese comments).
 
@@ -215,7 +229,7 @@ Resolution order:
 2. `~/.web/.env`
 3. `./.web/.env` (project; overrides above for same names)
 
-**Note:** only accounts with `enabled = true` resolve tokens. If `enabled = false`, placeholders are not required.
+**Note:** accounts resolve `{$VAR}` tokens when **not** disabled (`enabled = false`). If `enabled` is omitted, it defaults to **on** (same as `enabled = true`). With `enabled = false`, placeholders are not resolved and keys are not required.
 
 ### `[research]`
 
@@ -531,7 +545,7 @@ There is no verbose stderr stream. With `runtime.logging` (default), open `**<cw
 
 | Message                                                                | Cause                                                 | What to do                                                                              |
 | ---------------------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `环境变量未设置: TAVILY_API_KEY` (example)                                    | Account enabled but key missing in `~/.web/.env`.     | Add key or set `enabled = false` for that account.                                      |
+| `环境变量未设置: TAVILY_API_KEY` (example)                                    | Account not disabled (`enabled` omitted or true) but key missing in `~/.web/.env`.     | Add key or set `enabled = false` for that account.                                      |
 | `search: all configured accounts failed…`                              | Entire search chain failed or no search registration. | Check `<cwd>/.web/logs/`; verify `[search.account.*]` and keys.                         |
 | `research: no accounts configured…`                                    | No `[research.account.*]`.                            | Add tavily / perplexity research accounts.                                              |
 | `research: configured account(s) use provider(s) that do not support…` | Research section has non-research vendors.            | Use `provider = "tavily"` or `perplexity`.                                              |

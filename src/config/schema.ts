@@ -4,7 +4,7 @@ export const modelConfigSchema = z.object({
   provider: z.string().min(1),
   api_token: z.string().optional(),
   base_url: z.string().optional(),
-  enabled: z.boolean().optional(),
+  enabled: z.boolean().default(true),
 });
 
 export const groupConfigSchema = z.object({

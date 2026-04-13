@@ -126,7 +126,7 @@ web onboard init
 然后：
 
 1. 打开 `~/.web/.env`，把你有的 API 密钥填进去。默认模板启用了 Jina 的 search 与 fetch，**至少需要**填写 `JINA_API_KEY`（申请地址见 `init/config.toml` 或 `init/.env.example` 顶部列表）；其他厂商按需填写。
-2. 打开 `~/.web/config.toml`，按需取消注释模板里的 `[*.account.*]` 段，并把对应项的 `enabled` 改成 `true`。
+2. 打开 `~/.web/config.toml`，按需取消注释模板里的 `[*.account.*]` 段。不写 `enabled` 时默认为**启用**；只有需要关闭某条账号时才写 `enabled = false`。
 
 **如果你更喜欢交互式一步步选**：
 
@@ -219,7 +219,7 @@ enabled = false
 2. `~/.web/.env` 文件里写的
 3. `./.web/.env`（项目级，如果有的话，会覆盖上面的）
 
-**重要**：只有 `enabled = true` 的服务才会去找密钥。如果一个服务的 `enabled = false`，占位符不会被解析，密钥可以不填。
+**重要**：除 `enabled = false` 的账号外，其余（不写 `enabled` 或写 `true`）都会解析 `{$VAR}` 占位符并要求对应环境变量非空。`enabled = false` 时占位符不会被解析，密钥可以不填。
 
 ### 关于 `[research]` 这个段
 
@@ -576,7 +576,7 @@ inject_after = ""
 
 | 报错                                                                     | 原因                                                            | 怎么办                                                                                     |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `环境变量未设置: TAVILY_API_KEY`                                              | 你在 config 里开了 Tavily（`enabled = true`），但 `~/.web/.env` 里没填密钥。 | 去 `~/.web/.env` 填上密钥；如果暂时不想用这个服务，把 config 里对应的 `enabled` 改成 `false` 就行。                 |
+| `环境变量未设置: TAVILY_API_KEY`                                              | 你在 config 里启用了 Tavily（未写 `enabled` 或 `enabled = true`），但 `~/.web/.env` 里没填密钥。 | 去 `~/.web/.env` 填上密钥；如果暂时不想用这个服务，把 config 里对应的 `enabled` 改成 `false` 就行。                 |
 | `search: all configured accounts failed…`                              | 搜索链上全部失败或账号未注册 search。                                        | 查看 `<cwd>/.web/logs/`；核对 `[search.account.*]` 与密钥。                                      |
 | `research: no accounts configured…`                                    | `[research.account.*]` 为空。                                    | 添加 tavily / perplexity 的 research 账号。                                                   |
 | `research: configured account(s) use provider(s) that do not support…` | research 段里全是 jina/brave 等无官方 research 的厂商。                   | 改为 `provider = "tavily"` 或 `perplexity`。                                                |

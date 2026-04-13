@@ -8,7 +8,7 @@
 
 ## 2) `环境变量未设置: XXX`（`ENV_TOKEN_NOT_FOUND`）
 
-1. 检查 `~/.web/config.toml` 的 `api_token` 与 `enabled`
+1. 检查 `~/.web/config.toml` 的 `api_token` 与 `enabled`（未写 `enabled` 时视为启用）
 2. 在 `~/.web/.env` 添加对应变量，或将暂不使用的 model 设为 `enabled = false`
 3. `web config list` 确认模型存在
 
