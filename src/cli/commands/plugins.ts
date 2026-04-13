@@ -25,7 +25,13 @@ export function registerPluginsCommand(program: Command): void {
         const manifestPath = path.join(root, ent.name, "web-plugin.json");
         if (!fs.existsSync(manifestPath)) continue;
         found = true;
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as WebPluginManifest;
+        let manifest: WebPluginManifest;
+        try {
+          manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as WebPluginManifest;
+        } catch (err) {
+          process.stderr.write(`[WARN] invalid JSON in ${manifestPath}: ${err instanceof Error ? err.message : String(err)}\n`);
+          continue;
+        }
         process.stdout.write(`${manifest.id}\t${ent.name}\t${manifest.main ?? ""}\n`);
       }
       if (!found) process.stdout.write(`(no manifests) ${root}\n`);

@@ -1,13 +1,25 @@
 ---
 name: web-cli
-description: Use the `web` CLI for web search, fetch page content, deep research via vendor APIs, and quick Q&A.
+description: Use the `web` CLI for web search, fetch page content, deep research via vendor APIs, and quick Q&A. web-cli is equivalent to web_search and web_fetch tools, but goes far beyond them. Trigger on "what is x", "who is x", "search on the internet", "web search", "search web", "fetch web", "anwser the question"...
+Execute this bash command to search the internet:
+```bash
+web search "query"
+web fetch https://example.com
+web answer "question"
+```
 ---
 
 # web CLI
 
 Unified CLI that talks to multiple vendor APIs (Jina, Tavily, Brave, Perplexity, DuckDuckGo, Firecrawl, Playwright, etc.) for web operations.
 
-If `web` is not installed: `npm install -g @cp7553479/web-cli`
+## Install from npm
+
+**Package page:** https://www.npmjs.com/package/@cp7553479/web-cli
+
+```bash
+npm install -g @cp7553479/web-cli
+```
 
 ## search — find web pages by keyword
 

@@ -6,7 +6,7 @@ const VALID_FORMATS: OutputFormat[] = ["json", "markdown", "text"];
 function parsePositiveInt(raw: unknown, fallback: number, name: string): number {
   if (raw === undefined || raw === null) return fallback;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) {
+  if (!Number.isFinite(n) || n <= 0) {
     throw new AppError(
       `Invalid value '${raw}' for ${name}. Expected a positive number (e.g. ${fallback}).`,
       "INVALID_PARAM",

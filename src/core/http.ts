@@ -12,10 +12,17 @@ export interface HttpOptions {
 }
 
 export async function httpJson(url: string, options: HttpOptions): Promise<unknown> {
+  const safeHeaders: Record<string, string> = {};
+  for (const [k, v] of Object.entries(options.headers ?? {})) {
+    const lk = k.toLowerCase();
+    safeHeaders[k] = (lk === "authorization" || lk === "x-subscription-token" || lk === "x-goog-api-key")
+      ? `${v.slice(0, 8)}****`
+      : v;
+  }
   const reqPayload = {
     url,
     method: options.method ?? "GET",
-    headers: options.headers ?? {},
+    headers: safeHeaders,
     body: options.body ?? null,
   };
   options.fileLogger?.log("http.request", reqPayload);
@@ -37,7 +44,11 @@ export async function httpJson(url: string, options: HttpOptions): Promise<unkno
   try {
     return JSON.parse(text);
   } catch {
-    return { raw: text };
+    throw new AppError(
+      `HTTP ${response.statusCode} response is not valid JSON: ${url}`,
+      "HTTP_INVALID_JSON",
+      text.slice(0, 500),
+    );
   }
 }
 

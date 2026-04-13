@@ -7,7 +7,13 @@ description: Use the `web` CLI for web search, fetch page content, deep research
 
 Unified CLI that talks to multiple vendor APIs (Jina, Tavily, Brave, Perplexity, DuckDuckGo, Firecrawl, Playwright, etc.) for web operations.
 
-If `web` is not installed: `npm install -g @cp7553479/web-cli`
+## Install from npm
+
+**Package page:** [https://www.npmjs.com/package/@cp7553479/web-cli](https://www.npmjs.com/package/@cp7553479/web-cli)
+
+```bash
+npm install -g @cp7553479/web-cli
+```
 
 ## search — find web pages by keyword
 
@@ -61,22 +67,26 @@ web --max-length 20000 fetch https://example.com
 web --timeout-ms 30000 research "topic"
 ```
 
-| Option | Default | Purpose |
-|---|---|---|
-| `-f json\|markdown\|text` | `text` | Output format |
-| `--max-length N` | `10000` | Truncate output |
-| `--timeout-ms N` | `15000` | Request timeout |
+
+| Option                  | Default | Purpose         |
+| ----------------------- | ------- | --------------- |
+| `-f json|markdown|text` | `text`  | Output format   |
+| `--max-length N`        | `10000` | Truncate output |
+| `--timeout-ms N`        | `15000` | Request timeout |
+
 
 ## Routing options
 
 Available on all four commands:
 
-| Option | Purpose |
-|---|---|
-| `--account <id>` | Use a specific account from config |
-| `--provider <vendor>` | Use a specific vendor |
-| `--providers a b c` | Concurrent multi-source (results merged) |
-| `--vendor k=v` | Pass vendor-specific parameters |
+
+| Option                | Purpose                                  |
+| --------------------- | ---------------------------------------- |
+| `--account <id>`      | Use a specific account from config       |
+| `--provider <vendor>` | Use a specific vendor                    |
+| `--providers a b c`   | Concurrent multi-source (results merged) |
+| `--vendor k=v`        | Pass vendor-specific parameters          |
+
 
 If none specified, accounts are tried in the order declared in `config.toml`.
 

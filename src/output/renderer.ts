@@ -57,6 +57,7 @@ function renderMarkdown(response: ProviderResponse): string {
 
 function cut(input: string, maxLength: number): string {
   if (input.length <= maxLength) return input;
-  return `${input.slice(0, maxLength)}\n...[truncated]`;
+  const safe = Array.from(input).slice(0, maxLength).join("");
+  return `${safe}\n...[truncated]`;
 }
 

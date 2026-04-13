@@ -139,7 +139,10 @@ export class JinaSearchProvider implements SearchProvider {
       const raw = await httpJson(url, {
         timeoutMs: context.timeoutMs,
         fileLogger: context.fileLogger,
-        headers: this.model.apiToken ? { Authorization: `Bearer ${this.model.apiToken}` } : undefined,
+        headers: {
+          Accept: "application/json",
+          ...(this.model.apiToken ? { Authorization: `Bearer ${this.model.apiToken}` } : {}),
+        },
       });
       const items = normalizeJinaSearch(raw);
       const out = { provider: this.id, items, raw };
@@ -157,18 +160,17 @@ export class HttpFetchProvider implements FetchProvider {
     this.id = model.alias;
   }
   async fetch(request: FetchRequest, context: ProviderContext): Promise<ProviderResponse> {
-    try {
-      const items = [];
-      for (const url of request.urls) {
+    const items = [];
+    for (const url of request.urls) {
+      try {
         const raw = await httpJson(url, { timeoutMs: context.timeoutMs, fileLogger: context.fileLogger });
         items.push({ url, content: JSON.stringify(raw), source: "http" });
+      } catch (error) {
+        errorLog(`http.fetch.url_failed:${url}`, error);
+        items.push({ url, content: `Error: ${error instanceof Error ? error.message : String(error)}`, source: "http" });
       }
-      const out = { provider: this.id, items };
-      return out;
-    } catch (error) {
-      errorLog("http.fetch.error", error);
-      throw error;
     }
+    return { provider: this.id, items };
   }
 }
 
@@ -178,23 +180,25 @@ export class JinaReaderFetchProvider implements FetchProvider {
     this.id = model.alias;
   }
   async fetch(request: FetchRequest, context: ProviderContext): Promise<ProviderResponse> {
-    try {
-      const items = [];
-      for (const url of request.urls) {
+    const items = [];
+    for (const url of request.urls) {
+      try {
         const endpoint = `${this.model.baseUrl ?? "https://r.jina.ai/http://"}${url.replace(/^https?:\/\//, "")}`;
         const raw = await httpJson(endpoint, {
           timeoutMs: context.timeoutMs,
           fileLogger: context.fileLogger,
-          headers: this.model.apiToken ? { Authorization: `Bearer ${this.model.apiToken}` } : undefined,
+          headers: {
+            Accept: "application/json",
+            ...(this.model.apiToken ? { Authorization: `Bearer ${this.model.apiToken}` } : {}),
+          },
         });
         items.push({ url, content: JSON.stringify(raw), source: "jina_reader" });
+      } catch (error) {
+        errorLog(`jina.fetch.url_failed:${url}`, error);
+        items.push({ url, content: `Error: ${error instanceof Error ? error.message : String(error)}`, source: "jina_reader" });
       }
-      const out = { provider: this.id, items };
-      return out;
-    } catch (error) {
-      errorLog("jina.fetch.error", error);
-      throw error;
     }
+    return { provider: this.id, items };
   }
 }
 
@@ -204,10 +208,10 @@ export class FirecrawlScrapeFetchProvider implements FetchProvider {
     this.id = model.alias;
   }
   async fetch(request: FetchRequest, context: ProviderContext): Promise<ProviderResponse> {
-    try {
-      const endpoint = this.model.baseUrl ?? "https://api.firecrawl.dev/v2/scrape";
-      const items = [];
-      for (const url of request.urls) {
+    const endpoint = this.model.baseUrl ?? "https://api.firecrawl.dev/v2/scrape";
+    const items = [];
+    for (const url of request.urls) {
+      try {
         const raw = await httpJson(endpoint, {
           method: "POST",
           timeoutMs: context.timeoutMs,
@@ -223,13 +227,12 @@ export class FirecrawlScrapeFetchProvider implements FetchProvider {
           content: (raw as any).data?.markdown ?? JSON.stringify(raw),
           source: "firecrawl_scrape",
         });
+      } catch (error) {
+        errorLog(`firecrawl.fetch.url_failed:${url}`, error);
+        items.push({ url, content: `Error: ${error instanceof Error ? error.message : String(error)}`, source: "firecrawl_scrape" });
       }
-      const out = { provider: this.id, items };
-      return out;
-    } catch (error) {
-      errorLog("firecrawl.fetch.error", error);
-      throw error;
     }
+    return { provider: this.id, items };
   }
 }
 
