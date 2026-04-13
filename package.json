@@ -1,6 +1,6 @@
 {
   "name": "@cp7553479/web-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "dist/index.js",
   "bin": {
@@ -19,7 +19,13 @@
     "init/",
     "README.md"
   ],
-  "keywords": ["web", "search", "fetch", "research", "cli"],
+  "keywords": [
+    "web",
+    "search",
+    "fetch",
+    "research",
+    "cli"
+  ],
   "author": "cp7553479",
   "license": "ISC",
   "type": "commonjs",
