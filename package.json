@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "@cp7553479/web-cli",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
@@ -14,8 +14,13 @@
     "test:integration": "npm run build && vitest run tests/integration",
     "test:one": "npm run build && vitest run --"
   },
-  "keywords": [],
-  "author": "",
+  "files": [
+    "dist/",
+    "init/",
+    "README.md"
+  ],
+  "keywords": ["web", "search", "fetch", "research", "cli"],
+  "author": "cp7553479",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

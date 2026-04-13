@@ -1,16 +1,12 @@
 # Onboard：首次配置
 
-## `WEB_HOME`
-
-若导出非空环境变量 **`WEB_HOME`**，全局配置根为 `WEB_HOME` 指向的目录（替代 `~/.web`），`web config` / `web plugins list` / 各业务命令读取的 `config.toml`、`.env` 均位于该目录下。适合测试或隔离环境。`web onboard init` 写入的也是该目录。
-
 ## `web onboard`（交互）
 
-在 **TTY 终端**运行，使用多选与密码提示，**只写入 `~/.web/`**（`config.toml`、`.env`、`README.md`、`skills/web-cli/`），不会创建当前目录下的 `./.web`。
+在 **TTY 终端**运行，使用多选与密码提示，**只写入 `~/.web/`**（`config.toml`、`.env`、`README.md`、`README_CN.md`、`skills/web-cli/`），不会创建当前目录下的 `./.web`。
 
 1. 若尚无有效 `~/.web/config.toml`，会从仓库 `init/` 复制模板。
 2. 若已有配置：选择「在现有基础上调整」或「清空多选默认后重新勾选」。
-3. 空格勾选 Search / Fetch / Answer 能力，回车确认。
+3. 空格勾选 Search / Fetch / Answer 能力，回车确认（勾选 **Tavily** 或 **Perplexity** 的 Search 时，会按相同账号同步写入 `[research.account.*]`）。
 4. 按提示输入各 `{$ENV}` 对应的密钥（可留空，稍后编辑 `~/.web/.env`）。
 5. 确认后落盘。
 
@@ -22,7 +18,7 @@
 
 传 `--force` 时：若已有 `~/.web/.env`，会先读其中**非空**键值，再覆盖为模板后把这些键写回（保留模板注释与键顺序；仅合并有值的变量）。
 
-同时会写入或刷新 `~/.web/README.md`（本地速查：多账号声明顺序、`--provider` / `--account`；完整手册见仓库根目录 `README.md`）。
+`web onboard init` 在**首次**初始化 `~/.web/` 时会写入 `README.md`（英文）与 `README_CN.md`（中文），内容为本地速查（多账号顺序、`--provider` / `--account`）；传 `--force` 时强制覆盖这两个文件及 `config.toml` / `.env` 模板。交互向导结束时若缺少其中任一文件，会调用 `writeWebHomeReadmeIfMissing` 补齐。完整手册见仓库根目录 `README.md` / `README_CN.md`。
 
 会将 `init/skills/web-cli` 同步到 `~/.web/skills/web-cli`；若本机已存在 `~/.agent/skills`、`~/.claude/skills`、`~/.openclaw/skills`、`~/.codex/skills` 或 `~/.gemini/skills`，则在其下覆盖写入同名 `web-cli` 目录（不自动创建这些父目录）。
 

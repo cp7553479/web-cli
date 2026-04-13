@@ -36,8 +36,7 @@ export function deepStripTomlSymbols(value: unknown): unknown {
 }
 
 export function getConfigPaths(): ConfigPaths {
-  const raw = process.env.WEB_HOME?.trim();
-  const rootDir = raw && raw.length > 0 ? path.resolve(raw) : path.join(os.homedir(), ".web");
+  const rootDir = path.join(os.homedir(), ".web");
   return {
     rootDir,
     configPath: path.join(rootDir, "config.toml"),

@@ -9,4 +9,4 @@ node "$ROOT/dist/index.js" config set fetch kimi_fetch_default \
   --provider kimi_fetch \
   --token '{$MOONSHOT_API_KEY}' \
   --enabled true
-exec node "$ROOT/dist/index.js" fetch https://example.com --provider kimi_fetch --verbose
+exec node "$ROOT/dist/index.js" fetch https://example.com --provider kimi_fetch

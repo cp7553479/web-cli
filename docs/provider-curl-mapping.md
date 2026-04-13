@@ -21,7 +21,27 @@ curl "https://api.search.brave.com/res/v1/web/search?q=typescript+cli&count=5" \
 curl -X POST "https://api.tavily.com/search" \
   -H "Authorization: Bearer $TAVILY_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"query":"typescript cli","max_results":5}'
+  -d '{"query":"typescript cli","max_results":5,"include_answer":true}'
+```
+
+### Tavily Extract（`provider=tavily`，fetch 上下文）
+
+```bash
+curl -X POST "https://api.tavily.com/extract" \
+  -H "Authorization: Bearer $TAVILY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"urls":["https://example.com"],"format":"markdown"}'
+```
+
+### Tavily Research（`provider=tavily`，research 上下文）
+
+异步任务：`POST /research` 得 `request_id` 后 `GET /research/{request_id}` 轮询至 `completed`（见 [Tavily Research API](https://docs.tavily.com/documentation/api-reference/endpoint/research)）。
+
+```bash
+curl -X POST "https://api.tavily.com/research" \
+  -H "Authorization: Bearer $TAVILY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"input":"What are the latest developments in AI?","model":"auto","stream":false}'
 ```
 
 ### Firecrawl (`provider=firecrawl`)
@@ -82,7 +102,7 @@ curl "https://example.com"
 
 ### playwright (`provider=playwright`)
 
-本地启动 Chromium，无独立 HTTP API。参见 `src/fetch/playwright.ts`。
+本地启动 Chromium，无独立 HTTP API。抓取编排入口：`src/providers/playwright-fetch.ts`；浏览器与会话细节：`src/fetch/playwright.ts`。
 
 ### HTTP (`provider=http`)
 
@@ -127,6 +147,18 @@ curl "https://api.search.brave.com/res/v1/answers/search?q=What+is+Rust%3F" \
   -H "X-Subscription-Token: $BRAVE_API_TOKEN"
 ```
 
+### Tavily（`provider=tavily`，answer 上下文）
+
+与 Search 同源：`POST https://api.tavily.com/search`，`include_answer` 为 `true` / `basic` / `advanced`。
+
+### Perplexity Sonar（`provider=perplexity`，answer 上下文）
+
+OpenAI 兼容：`POST https://api.perplexity.ai/chat/completions`，`model` 如 `sonar-pro`。
+
+### Firecrawl Interact（`provider=firecrawl`，answer 上下文）
+
+先 `POST /v2/scrape` 取 `scrapeId`，再 `POST /v2/scrape/{scrapeId}/interact` 传 `prompt`。见 [Interact](https://docs.firecrawl.dev/features/interact)。
+
 ### Gemini + Google 搜索接地 (`provider=gemini`)
 
 官方 REST：`generateContent`，请求体含 `tools: [ { "google_search": {} } ]`，响应 `candidates[].groundingMetadata` 含检索片段与引用。详见 [Grounding with Google Search](https://ai.google.dev/gemini-api/docs/google-search)。
@@ -137,3 +169,13 @@ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:g
   -H "Content-Type: application/json" \
   -d '{"contents":[{"role":"user","parts":[{"text":"What is Rust?"}]}],"tools":[{"google_search":{}}]}'
 ```
+
+## Research
+
+### Tavily（`provider=tavily`）
+
+见上文 **Tavily Research**：`POST /research` 与 `GET /research/{request_id}`。
+
+### Perplexity（`provider=perplexity`）
+
+`POST https://api.perplexity.ai/chat/completions`，`model` 如 `sonar-deep-research`（可用 `--vendor model=...` 覆盖）。见 [Sonar quickstart](https://docs.perplexity.ai/docs/sonar/quickstart)。

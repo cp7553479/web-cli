@@ -1,9 +1,13 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** 仓库根（tests/helpers → 上两级），不依赖 Vitest 进程 cwd。 */
+export const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 export function distEntry(): string {
-  return path.join(process.cwd(), "dist", "index.js");
+  return path.join(repoRoot, "dist", "index.js");
 }
 
 export function assertDistBuilt(): void {
@@ -22,7 +26,7 @@ export function runWeb(
   try {
     const stdout = execFileSync(node, [distEntry(), ...args], {
       encoding: "utf8",
-      cwd: options.cwd ?? process.cwd(),
+      cwd: options.cwd ?? repoRoot,
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });

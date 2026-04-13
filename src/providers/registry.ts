@@ -1,9 +1,16 @@
-import type { AnswerProvider, FetchProvider, ProviderRegistry, SearchProvider } from "./types";
+import type {
+  AnswerProvider,
+  FetchProvider,
+  ProviderRegistry,
+  ResearchProvider,
+  SearchProvider,
+} from "./types";
 
 export class InMemoryProviderRegistry implements ProviderRegistry {
   private searchMap = new Map<string, SearchProvider>();
   private fetchMap = new Map<string, FetchProvider>();
   private answerMap = new Map<string, AnswerProvider>();
+  private researchMap = new Map<string, ResearchProvider>();
 
   registerSearch(provider: SearchProvider): this {
     this.searchMap.set(provider.id, provider);
@@ -20,6 +27,11 @@ export class InMemoryProviderRegistry implements ProviderRegistry {
     return this;
   }
 
+  registerResearch(provider: ResearchProvider): this {
+    this.researchMap.set(provider.id, provider);
+    return this;
+  }
+
   getSearch(id: string): SearchProvider | undefined {
     return this.searchMap.get(id);
   }
@@ -32,6 +44,10 @@ export class InMemoryProviderRegistry implements ProviderRegistry {
     return this.answerMap.get(id);
   }
 
+  getResearch(id: string): ResearchProvider | undefined {
+    return this.researchMap.get(id);
+  }
+
   listSearch(): string[] {
     return [...this.searchMap.keys()];
   }
@@ -42,6 +58,10 @@ export class InMemoryProviderRegistry implements ProviderRegistry {
 
   listAnswer(): string[] {
     return [...this.answerMap.keys()];
+  }
+
+  listResearch(): string[] {
+    return [...this.researchMap.keys()];
   }
 }
 

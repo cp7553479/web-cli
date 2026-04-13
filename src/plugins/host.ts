@@ -39,6 +39,15 @@ export class PluginHost implements PluginRegistrationApi {
       registry.registerAnswer(factory.createAnswer({ alias, model }));
     }
 
+    for (const [alias, model] of Object.entries(config.research.account)) {
+      if (model.enabled === false) continue;
+      const factory = this.factories.get(model.provider);
+      if (!factory?.createResearch) {
+        continue;
+      }
+      registry.registerResearch(factory.createResearch({ alias, model }));
+    }
+
     return registry;
   }
 }

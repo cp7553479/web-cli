@@ -15,6 +15,7 @@ describe("resolveForcedAccountOrder", () => {
       a: { provider: "tavily" },
     });
     expect(resolveForcedAccountOrder(g, "search", {})).toEqual(["b", "a"]);
+    expect(resolveForcedAccountOrder(g, "research", {})).toEqual(["b", "a"]);
   });
 
   it("仅 vendor：同厂商多条时保留全表声明顺序子序列", () => {

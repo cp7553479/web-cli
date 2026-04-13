@@ -30,9 +30,8 @@
 
 ## 测试
 
-- **目录**：仅使用 [`tests/`](tests/)（原根目录 `test/` 已并入 [`tests/manual/`](tests/manual/)）。`tests/unit/` 为纯逻辑单测；`tests/integration/` 为对 `dist/index.js` 的子进程 CLI 测试（会读网络或写临时 `WEB_HOME`）；`tests/manual/` 为可逐项执行的 shell 脚本。
-- **环境**：Vitest 启动时会加载仓库根目录 [`.env.local`](.env.local)（若存在），便于集成测试继承密钥；**勿将** `.env.local` 提交到 git。
-- **隔离**：集成测试通过环境变量 **`WEB_HOME`** 指向临时目录，代替默认的 `~/.web`，避免污染本机配置。产品代码中 [`getConfigPaths()`](src/config/index.ts) 在设置了非空 `WEB_HOME` 时使用其绝对路径作为配置根目录。
+- **目录**：仅使用 [`tests/`](tests/)（原根目录 `test/` 已并入 [`tests/manual/`](tests/manual/)）。`tests/unit/` 为纯逻辑单测；`tests/integration/` 为对 `dist/index.js` 的子进程 CLI 测试（默认子进程 **cwd 为仓库根**，与真实使用一致）；`tests/manual/` 为可逐项执行的 shell 脚本。
+- **配置与密钥**：集成测依赖 **`~/.web` 与仓库根 [`./.web/`](.web/) 的既有合并**（[`loadConfig`](src/config/index.ts)）；密钥放在 `./.web/.env` 或 `~/.web/.env`，**勿提交**含密钥的文件。外网烟测需显式开启：**`WEB_RUN_JINA_SMOKE=1`**（Jina search）、**`WEB_RUN_FETCH_HTTP_SMOKE=1`**（`--provider http` fetch）；未设置则对应用例跳过。
 - **新功能**：新增或变更命令、CLI 参数、配置结构或 provider 行为时，必须在 `tests/` 下**新增或修改**对应用例，并保持 `npm test` 通过。
 - **逐项跑**：可用 `npm run test:one -- tests/integration/cli-root-help.test.ts` 或 `npm run test:unit` / `npm run test:integration` 分批执行。
 
@@ -50,7 +49,8 @@ npm test
 
 当新增或变更 provider/命令参数时，必须同步更新：
 
-- `README.md`
+- `README.md`（英文默认）
+- `README_CN.md`（中文）
 - `docs/provider-curl-mapping.md`
 - `docs/onboard.md`
 - `docs/plugin-protocol.md`

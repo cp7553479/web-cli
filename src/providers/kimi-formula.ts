@@ -173,7 +173,7 @@ export class KimiSearchProvider implements SearchProvider {
     try {
       const base = moonshotBase(this.model);
       const apiKey = this.model.apiToken ?? "";
-      const userText = `请使用官方联网检索工具回答。查询：${buildSearchQuery(request)}。请在最终回复中整理至多 ${request.limit} 条相关要点，并尽量包含可点击来源或 URL。`;
+      const userText = `Use $web_search tool to query:\n${buildSearchQuery(request)}\n\n请使用官方联网检索工具回答。请在最终回复中整理至多 ${request.limit} 条相关要点，并尽量包含可点击来源或 URL。`;
       const { text, rawTrace } = await runFormulaChat({
         base,
         apiKey,

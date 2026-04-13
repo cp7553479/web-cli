@@ -9,4 +9,4 @@ node "$ROOT/dist/index.js" config set search kimi_search_default \
   --provider kimi_search \
   --token '{$MOONSHOT_API_KEY}' \
   --enabled true
-exec node "$ROOT/dist/index.js" search "Moonshot AI Kimi" --limit 3 --provider kimi_search --verbose
+exec node "$ROOT/dist/index.js" search "Moonshot AI Kimi" --limit 3 --provider kimi_search

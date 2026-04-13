@@ -27,7 +27,7 @@
 - 新增 provider 时，同步更新：
   - `docs/provider-curl-mapping.md`
   - `init/skills/web-cli/` 与 `.claude/skills/web-cli/` 下对应文档
-- 修改命令参数时，同步更新 README 与 skill 示例
+- 修改命令参数时，同步更新 `README.md`、`README_CN.md` 与 skill 示例
 - 任何改动都要保证：
   - `npm run build`
   - `npm test`

@@ -1,5 +1,5 @@
 import { AppError } from "../core/errors";
-import type { GroupConfig } from "./types";
+import type { GroupConfig, GroupName } from "./types";
 
 export type ResolveForcedAccountOpts = {
   vendorOrAlias?: string;
@@ -20,7 +20,7 @@ function availableList(group: GroupConfig): string[] {
  */
 export function resolveForcedAccountOrder(
   group: GroupConfig,
-  groupName: "search" | "fetch" | "answer",
+  groupName: GroupName,
   opts: ResolveForcedAccountOpts,
 ): string[] {
   const order = Object.keys(group.account);

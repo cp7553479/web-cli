@@ -1,44 +1,93 @@
 ---
 name: web-cli
-description: Use the `web` CLI for search, fetch, research, and answer with unified ~/.web config and multi-account failover.
+description: Use the `web` CLI for web search, fetch page content, deep research via vendor APIs, and quick Q&A.
 ---
 
-# Web CLI（Agent 速查）
+# web CLI
 
-## 何时用
+Unified CLI that talks to multiple vendor APIs (Jina, Tavily, Brave, Perplexity, DuckDuckGo, Firecrawl, Playwright, etc.) for web operations.
 
-需要联网检索、抓正文、先搜后抓汇总、或即时问答时，**优先走 `web`**，不要散落调用各厂商 HTTP。
+If `web` is not installed: `npm install -g @cp7553479/web-cli`
 
-## 硬规则
+## search — find web pages by keyword
 
-1. 先确认配置：`web config list`
-2. 用 **account id**（如 `kimi-main`）或 `--provider <厂商名>`，**禁止**在命令里写 token
-3. `--providers`（多路并发）与 `--account` **互斥**
-
-## 配置
-
-- 全局：`~/.web/config.toml` + `~/.web/.env`（由 `init/.env.example` 经 `web onboard init` 生成）
-- 项目覆写：`./.web/config.toml` / `./.web/.env` 与全局深度合并
-- 同组 `[group.account.*]` **声明顺序 = 尝试顺序**；`--provider <厂商名>` 时只在该厂商的多条账号间按此顺序 failover
-
-## 命令
+Returns a list of URLs with titles and snippets.
 
 ```bash
-web search "<q>" [--provider <alias|vendor>] [--account <id>] [--providers a b ...]
-web fetch <url...> [--provider <alias|vendor>] [--account <id>]
-web research "<q>" [--max-sources N] [--provider ...] [--account ...] [--providers ...]
-web answer "<q>" [--provider ...] [--account ...] [--providers ...]
-web config list
-web onboard init              # 模板 + skills 写入 ~/.web
-web onboard init --force      # 覆盖 config；.env 会合并旧文件非空键
+web search "query"
+web search "query" --site github.com npmjs.com
+web search "query" --country US --language en --freshness week
+web search "query" --limit 10
+web search "query" --providers jina-main tavily-main    # concurrent multi-source
 ```
 
-全局输出与超时：`-f json|markdown|text`、`--max-length`、`--timeout-ms`（写在 `web` 与子命令之间）。
+## fetch — get the content of a web page
 
-## 可观测性
+Extracts the main text/markdown from one or more URLs.
 
-无 `--verbose`。请求/响应与 CLI 指令在 **`runtime.logging` 未关闭** 时写入 **`<cwd>/.web/logs/*.log`**。失败时先看该日志与 `web config list`。
+```bash
+web fetch https://example.com
+web fetch https://a.com https://b.com -f markdown
+web fetch https://spa.example.com --provider playwright --wait-until networkidle
+web fetch https://example.com --selector "article"
+```
 
-## 参考
+## research — deep research via vendor API
 
-同目录 `examples.md`、`troubleshooting.md`；仓库内完整手册见根目录 `README.md`、`docs/onboard.md`。
+Calls the vendor's dedicated research endpoint (e.g. Tavily, Perplexity). This is **not** a local search-then-fetch pipeline.
+
+```bash
+web research "topic" --max-sources 6
+web research "topic" --providers tavily-main perplexity-main
+```
+
+## answer — quick Q&A
+
+Gets a direct answer from a Q&A vendor API (DuckDuckGo, Brave, Firecrawl, etc.).
+
+```bash
+web answer "question"
+web answer "question about this page" --url https://example.com
+web answer "question" --providers ddg-main brave-answer
+```
+
+## Global options
+
+Place these between `web` and the subcommand:
+
+```bash
+web -f markdown search "query"
+web --max-length 20000 fetch https://example.com
+web --timeout-ms 30000 research "topic"
+```
+
+| Option | Default | Purpose |
+|---|---|---|
+| `-f json\|markdown\|text` | `text` | Output format |
+| `--max-length N` | `10000` | Truncate output |
+| `--timeout-ms N` | `15000` | Request timeout |
+
+## Routing options
+
+Available on all four commands:
+
+| Option | Purpose |
+|---|---|
+| `--account <id>` | Use a specific account from config |
+| `--provider <vendor>` | Use a specific vendor |
+| `--providers a b c` | Concurrent multi-source (results merged) |
+| `--vendor k=v` | Pass vendor-specific parameters |
+
+If none specified, accounts are tried in the order declared in `config.toml`.
+
+## Config & logs
+
+```bash
+web config list                         # show active config
+```
+
+Logs: `<cwd>/.web/logs/*.log`
+
+## Troubleshooting
+
+See `troubleshooting.md` in the same directory. More examples in `examples.md`.

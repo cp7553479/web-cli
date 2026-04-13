@@ -77,9 +77,12 @@ function buildConfig(selected: Set<string>, envValues: Record<string, string>): 
     cfg.answer.account["ddg-main"] = { provider: "duckduckgo", enabled: true };
   }
 
-  const firstSearch = Object.entries(cfg.search.account)[0];
-  if (firstSearch) {
-    cfg.research.account[firstSearch[0]] = { ...firstSearch[1] };
+  const researchProviders = new Set(["tavily", "perplexity"]);
+  for (const c of WIZARD_CHOICES) {
+    if (c.group !== "search" || !researchProviders.has(c.provider)) continue;
+    if (!selected.has(c.value)) continue;
+    const m = cfg.search.account[c.alias];
+    if (m) cfg.research.account[c.alias] = { ...m };
   }
 
   return cfg;

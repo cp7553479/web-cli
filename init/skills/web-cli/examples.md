@@ -55,7 +55,7 @@ web fetch https://news.ycombinator.com \
 
 ## 6) 研究型任务
 
-用户意图：先搜再抓再汇总
+用户意图：调用厂商 **research** API（需在 `[research.account.*]` 配置 tavily 或 perplexity）
 
 ```bash
 web research "2026 search API pricing comparison" \
@@ -119,11 +119,11 @@ web answer \
 
 ## 12) 多源并发研究
 
-用户意图：搜索阶段用多个源，研究更全面
+用户意图：多个 **research** provider 并发（均为已注册的 research 账号，例如两个 tavily 或 tavily+perplexity）
 
 ```bash
 web research "2026 前端框架趋势" \
-  --providers jina-main tavily-main \
+  --providers tavily-main perplexity-main \
   --max-sources 8 \
   -f markdown
 ```

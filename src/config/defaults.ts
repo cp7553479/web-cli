@@ -16,9 +16,7 @@ export function defaultConfig(): WebConfig {
       },
     },
     research: {
-      account: {
-        "jina-main": { provider: "jina", api_token: "{$JINA_API_KEY}", enabled: true },
-      },
+      account: {},
     },
     answer: {
       account: {

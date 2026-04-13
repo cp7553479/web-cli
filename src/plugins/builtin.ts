@@ -1,6 +1,8 @@
+import { FirecrawlInteractAnswerProvider } from "../providers/firecrawl-interact-answer";
 import { GeminiGoogleSearchAnswerProvider } from "../providers/gemini";
 import { KimiFetchProvider, KimiSearchProvider } from "../providers/kimi-formula";
 import type { ProviderModelOptions } from "../providers/options";
+import { PerplexityResearchProvider, PerplexitySonarAnswerProvider } from "../providers/perplexity-sonar";
 import {
   BraveAnswerProvider,
   BraveSearchProvider,
@@ -11,8 +13,13 @@ import {
   JinaReaderFetchProvider,
   JinaSearchProvider,
   PerplexitySearchProvider,
-  TavilyProvider,
 } from "../providers/official";
+import {
+  TavilyAnswerProvider,
+  TavilyExtractFetchProvider,
+  TavilyResearchProvider,
+  TavilySearchProvider,
+} from "../providers/tavily";
 import { Html2MarkdownFetchProvider } from "../providers/html2markdown";
 import { PlaywrightFetchProvider } from "../providers/playwright-fetch";
 import type { ProviderModelBinding } from "./protocol";
@@ -34,16 +41,22 @@ export function registerBuiltinFactories(host: PluginHost): void {
   });
 
   host.registerProvider("tavily", {
-    createSearch: (b) => new TavilyProvider(toOptions(b)),
+    createSearch: (b) => new TavilySearchProvider(toOptions(b)),
+    createFetch: (b) => new TavilyExtractFetchProvider(toOptions(b)),
+    createAnswer: (b) => new TavilyAnswerProvider(toOptions(b)),
+    createResearch: (b) => new TavilyResearchProvider(toOptions(b)),
   });
 
   host.registerProvider("firecrawl", {
     createSearch: (b) => new FirecrawlSearchProvider(toOptions(b)),
     createFetch: (b) => new FirecrawlScrapeFetchProvider(toOptions(b)),
+    createAnswer: (b) => new FirecrawlInteractAnswerProvider(toOptions(b)),
   });
 
   host.registerProvider("perplexity", {
     createSearch: (b) => new PerplexitySearchProvider(toOptions(b)),
+    createAnswer: (b) => new PerplexitySonarAnswerProvider(toOptions(b)),
+    createResearch: (b) => new PerplexityResearchProvider(toOptions(b)),
   });
 
   host.registerProvider("jina", {

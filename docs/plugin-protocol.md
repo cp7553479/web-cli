@@ -3,20 +3,20 @@
 ## 分层
 
 1. **协议层**（`src/plugins/protocol.ts`）
-   定义 `PluginRegistrationApi`：以厂商名注册 `ProviderFactory`，每个 factory 可声明 `createSearch` / `createFetch` / `createAnswer` 三类子组件。
+   定义 `PluginRegistrationApi`：以厂商名注册 `ProviderFactory`，每个 factory 可声明 `createSearch` / `createFetch` / `createAnswer` / `createResearch` 子组件（按需实现）。
 
 2. **宿主**（`src/plugins/host.ts`）
-   `PluginHost` 维护一个 `Map<厂商名, ProviderFactory>`。`materialize(config)` 时，遍历 config 各能力段的 `account`，根据 `provider`（厂商名）查找 factory，按当前能力段上下文调用对应的 `createSearch` / `createFetch` / `createAnswer`，生成 `InMemoryProviderRegistry`。
+   `PluginHost` 维护一个 `Map<厂商名, ProviderFactory>`。`materialize(config)` 时，遍历 `search` / `fetch` / `answer` / `research` 各能力段的 `account`，根据 `provider`（厂商名）查找 factory，按当前能力段调用对应的 `createSearch` / `createFetch` / `createAnswer` / `createResearch`，生成 `InMemoryProviderRegistry`。
 
 3. **内置插件**（`src/plugins/builtin.ts`）
    当前所有官方对接的 provider 以厂商为单位注册，**不**放在 `~/.web/plugins`。
 
 4. **外部插件加载器**（`src/plugins/loader.ts`）
-   扫描全局配置根下的 `plugins/<name>/web-plugin.json`（默认 `~/.web/plugins`；若设置环境变量 **`WEB_HOME`** 则为 `$WEB_HOME/plugins`），`require` 入口模块并调用 `activate(api)`。
+   扫描 `~/.web/plugins/<name>/web-plugin.json`（以及当前 cwd 下 `./.web/plugins`，见下文），`require` 入口模块并调用 `activate(api)`。
 
 ## 配置如何映射到实例
 
-全局 `config.toml`（默认 `~/.web/config.toml`；若设置 **`WEB_HOME`** 则为 `$WEB_HOME/config.toml`）中每条 model：
+`~/.web/config.toml`（及可选合并的 `./.web/config.toml`）中每条 **`[*.account.alias]`** 账号块：
 
 ```toml
 [search.account.my-alias]
@@ -24,17 +24,19 @@ provider = "tavily"
 api_token = "{$TAVILY_API_KEY}"
 ```
 
-`provider` 字段写**厂商名**，必须与某插件注册的 factory 名一致。`PluginHost` 根据当前能力段（search / fetch / answer）为每个启用的 `(alias, model)` 调用 factory 对应的 `createSearch` / `createFetch` / `createAnswer`，得到 provider 实例；实例的 `id` 为 **alias**（与 orchestrator 查找一致）。
+`provider` 字段写**厂商名**，必须与某插件注册的 factory 名一致。`PluginHost` 根据当前能力段（search / fetch / answer / research）为每个启用的 **`(alias, account)`** 调用 factory 对应的 `createSearch` / `createFetch` / `createAnswer` / `createResearch`，得到 provider 实例；实例的 `id` 为 **alias**（与 orchestrator 查找一致）。
 
-如果某厂商未提供当前能力段所需的子组件（如在 `[fetch]` 段配了 `provider = "tavily"` 但 tavily factory 没有 `createFetch`），该 model 会被跳过并输出 debug 日志。
+如果某厂商未提供当前能力段所需的子组件（如在 `[fetch]` 段配了 `provider = "duckduckgo"` 但 factory 没有 `createFetch`），该账号会被跳过。
 
 ## 外部插件目录布局
 
 ```
-<全局配置根>/plugins/   # 默认 ~/.web/plugins；WEB_HOME 时为 $WEB_HOME/plugins
+~/.web/plugins/          # 用户级外部插件
   my-vendor/
     web-plugin.json
     index.cjs
+
+./.web/plugins/          # 项目级（与 ~/.web/plugins 同名工厂时后者覆盖注册）
 ```
 
 ### web-plugin.json

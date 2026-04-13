@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import { ensureConfigDir } from "../../config";
 import { getUserPluginsRoot } from "../../plugins/loader";
 import { resolvePackageInitDir } from "./init-paths";
-import { defaultWebHomeReadme } from "./readme-template";
+import { defaultWebHomeReadme, defaultWebHomeReadmeCn } from "./readme-template";
 import { syncAgentSkillsFromPackage } from "./sync-skills";
 
 export { resolvePackageInitDir } from "./init-paths";
@@ -66,9 +66,18 @@ export function copyInitToWebHome(opts: { force: boolean }): void {
     fs.writeFileSync(paths.envPath, merged, "utf8");
   }
   fs.mkdirSync(getUserPluginsRoot(), { recursive: true });
-  const readmePath = path.join(paths.rootDir, "README.md");
-  if (opts.force || !fs.existsSync(readmePath)) {
-    fs.writeFileSync(readmePath, defaultWebHomeReadme(), "utf8");
+  const readmeEn = path.join(paths.rootDir, "README.md");
+  const readmeCn = path.join(paths.rootDir, "README_CN.md");
+  if (opts.force) {
+    fs.writeFileSync(readmeEn, defaultWebHomeReadme(), "utf8");
+    fs.writeFileSync(readmeCn, defaultWebHomeReadmeCn(), "utf8");
+  } else {
+    if (!fs.existsSync(readmeEn)) {
+      fs.writeFileSync(readmeEn, defaultWebHomeReadme(), "utf8");
+    }
+    if (!fs.existsSync(readmeCn)) {
+      fs.writeFileSync(readmeCn, defaultWebHomeReadmeCn(), "utf8");
+    }
   }
   syncAgentSkillsFromPackage();
   process.stdout.write(`Initialized: ${paths.rootDir}\n`);
@@ -77,8 +86,12 @@ export function copyInitToWebHome(opts: { force: boolean }): void {
 }
 
 export function writeWebHomeReadmeIfMissing(rootDir: string): void {
-  const readmePath = path.join(rootDir, "README.md");
-  if (!fs.existsSync(readmePath)) {
-    fs.writeFileSync(readmePath, defaultWebHomeReadme(), "utf8");
+  const readmeEn = path.join(rootDir, "README.md");
+  const readmeCn = path.join(rootDir, "README_CN.md");
+  if (!fs.existsSync(readmeEn)) {
+    fs.writeFileSync(readmeEn, defaultWebHomeReadme(), "utf8");
+  }
+  if (!fs.existsSync(readmeCn)) {
+    fs.writeFileSync(readmeCn, defaultWebHomeReadmeCn(), "utf8");
   }
 }

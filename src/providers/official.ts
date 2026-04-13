@@ -1,6 +1,13 @@
 import { httpJson } from "../core/http";
 import { errorLog } from "../core/logger";
-import type { AnswerRequest, FetchRequest, ProviderContext, ProviderResponse, SearchRequest } from "../core/types";
+import type {
+  AnswerRequest,
+  FetchRequest,
+  ProviderContext,
+  ProviderResponse,
+  SearchRequest,
+} from "../core/types";
+import { pickWhitelisted } from "./vendor-params";
 import type { ProviderModelOptions } from "./options";
 import type { AnswerProvider, FetchProvider, SearchProvider } from "./types";
 
@@ -16,7 +23,17 @@ export class BraveSearchProvider implements SearchProvider {
     try {
       const query = buildSearchQuery(request);
       const endpoint = this.model.baseUrl ?? "https://api.search.brave.com/res/v1/web/search";
-      const url = `${endpoint}?q=${encodeURIComponent(query)}&count=${request.limit}`;
+      const extra = pickWhitelisted(request.vendorParams, new Set(["country", "search_lang", "safesearch", "ui_lang", "extra_snippets"]));
+      const qp = new URLSearchParams({ q: query, count: String(request.limit) });
+      if (request.country) qp.set("country", request.country);
+      if (request.language) qp.set("search_lang", request.language);
+      if (request.safesearch !== undefined && request.safesearch !== "") {
+        qp.set("safesearch", String(request.safesearch));
+      }
+      for (const [k, v] of Object.entries(extra)) {
+        if (v !== undefined && v !== null) qp.set(k, String(v));
+      }
+      const url = `${endpoint}?${qp.toString()}`;
       const raw = await httpJson(url, {
         timeoutMs: context.timeoutMs,
         fileLogger: context.fileLogger,
@@ -32,45 +49,6 @@ export class BraveSearchProvider implements SearchProvider {
       return out;
     } catch (error) {
       errorLog("brave.search.error", error);
-      throw error;
-    }
-  }
-}
-
-export class TavilyProvider implements SearchProvider {
-  readonly id: string;
-  constructor(private readonly model: ProviderModelOptions) {
-    this.id = model.alias;
-  }
-
-  async search(request: SearchRequest, context: ProviderContext): Promise<ProviderResponse> {
-    try {
-      const endpoint = this.model.baseUrl ?? "https://api.tavily.com/search";
-      const raw = await httpJson(endpoint, {
-        method: "POST",
-        timeoutMs: context.timeoutMs,
-        fileLogger: context.fileLogger,
-        headers: {
-          Authorization: `Bearer ${this.model.apiToken ?? ""}`,
-          "Content-Type": "application/json",
-        },
-        body: {
-          query: buildSearchQuery(request),
-          max_results: request.limit,
-          include_answer: false,
-        },
-      });
-      const items = ((raw as any).results ?? []).map((item: any) => ({
-        title: item.title,
-        url: item.url,
-        content: item.content,
-        snippet: item.content,
-        source: "tavily",
-      }));
-      const out = { provider: this.id, items, raw };
-      return out;
-    } catch (error) {
-      errorLog("tavily.search.error", error);
       throw error;
     }
   }

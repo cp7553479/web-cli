@@ -55,7 +55,7 @@ web fetch https://news.ycombinator.com \
 
 ## 6) 研究型任务
 
-用户意图：先搜再抓再汇总
+用户意图：调用厂商 **research** API（需在 `[research.account.*]` 配置 tavily 或 perplexity）
 
 ```bash
 web research "2026 search API pricing comparison" \

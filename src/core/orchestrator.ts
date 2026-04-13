@@ -7,6 +7,7 @@ import type {
   FetchRequest,
   ProviderContext,
   ProviderResponse,
+  ResearchRequest,
   SearchRequest,
 } from "./types";
 
@@ -43,6 +44,12 @@ export class Orchestrator {
     forcedAccount?: string,
   ): Promise<ProviderResponse> {
     const aliases = this.resolveCandidates("search", forcedProvider, forcedAccount);
+    if (aliases.length === 0) {
+      throw new AppError(
+        `search: no accounts configured under [search.account.*].`,
+        "SEARCH_NO_ACCOUNTS",
+      );
+    }
     let lastError: unknown;
     for (const alias of aliases) {
       const provider = this.registry.getSearch(alias);
@@ -57,7 +64,7 @@ export class Orchestrator {
     }
     const reason = lastError instanceof Error ? lastError.message : "no provider available";
     throw new AppError(
-      `All search providers failed: ${reason}\n  Tip: check .web/logs under the process cwd (when runtime logging is on) and run web config list.`,
+      `search: all configured accounts failed or do not support search for this request (${reason}).\n  Tip: check .web/logs and [search.account.*]; unsupported providers are skipped.`,
       "SEARCH_ALL_FAILED",
     );
   }
@@ -70,13 +77,16 @@ export class Orchestrator {
         if (!provider) continue;
         return provider.search(request, this.context);
       }
-      throw new AppError(`No registered search provider for: ${name}`, "PROVIDER_NOT_FOUND");
+      throw new AppError(`search: no registered provider for: ${name}`, "PROVIDER_NOT_FOUND");
     });
     return this.mergeMulti(tasks, "search");
   }
 
   async fetch(request: FetchRequest, forcedProvider?: string, forcedAccount?: string): Promise<ProviderResponse> {
     const aliases = this.resolveCandidates("fetch", forcedProvider, forcedAccount);
+    if (aliases.length === 0) {
+      throw new AppError(`fetch: no accounts configured under [fetch.account.*].`, "FETCH_NO_ACCOUNTS");
+    }
     let lastError: unknown;
     for (const alias of aliases) {
       const provider = this.registry.getFetch(alias);
@@ -91,7 +101,7 @@ export class Orchestrator {
     }
     const reason = lastError instanceof Error ? lastError.message : "no provider available";
     throw new AppError(
-      `All fetch providers failed: ${reason}\n  Tip: check .web/logs under the process cwd; adjust --provider / --account or reorder [fetch.account.*].`,
+      `fetch: all configured accounts failed or do not support fetch (${reason}).\n  Tip: check .web/logs and [fetch.account.*].`,
       "FETCH_ALL_FAILED",
     );
   }
@@ -102,6 +112,9 @@ export class Orchestrator {
     forcedAccount?: string,
   ): Promise<ProviderResponse> {
     const aliases = this.resolveCandidates("answer", forcedProvider, forcedAccount);
+    if (aliases.length === 0) {
+      throw new AppError(`answer: no accounts configured under [answer.account.*].`, "ANSWER_NO_ACCOUNTS");
+    }
     let lastError: unknown;
     for (const alias of aliases) {
       const provider = this.registry.getAnswer(alias);
@@ -116,7 +129,7 @@ export class Orchestrator {
     }
     const reason = lastError instanceof Error ? lastError.message : "no provider available";
     throw new AppError(
-      `All answer providers failed: ${reason}\n  Tip: check .web/logs under the process cwd (when runtime logging is on) and run web config list.`,
+      `answer: all configured accounts failed or do not support answer (${reason}).\n  Tip: check .web/logs and [answer.account.*].`,
       "ANSWER_ALL_FAILED",
     );
   }
@@ -129,56 +142,61 @@ export class Orchestrator {
         if (!provider) continue;
         return provider.answer(request, this.context);
       }
-      throw new AppError(`No registered answer provider for: ${name}`, "PROVIDER_NOT_FOUND");
+      throw new AppError(`answer: no registered provider for: ${name}`, "PROVIDER_NOT_FOUND");
     });
     return this.mergeMulti(tasks, "answer");
   }
 
   async research(
-    query: string,
-    maxSources: number,
+    request: ResearchRequest,
     forcedProvider?: string,
     forcedAccount?: string,
   ): Promise<ProviderResponse> {
-    const searchResult = await this.search({ query, limit: maxSources }, forcedProvider, forcedAccount);
-    const urls = searchResult.items.map((item) => item.url).filter((url): url is string => Boolean(url)).slice(0, maxSources);
-    if (urls.length === 0) return searchResult;
-    const fetched = await this.fetch({ urls });
-    const merged = {
-      provider: `research(${searchResult.provider}+${fetched.provider})`,
-      items: [
-        {
-          title: query,
-          content: fetched.items.map((item) => `${item.url ?? ""}\n${item.content ?? item.snippet ?? ""}`).join("\n\n"),
-          source: "research",
-        },
-      ],
-      raw: { search: searchResult.raw, fetch: fetched.raw },
-    };
-    return merged;
+    const aliases = this.resolveCandidates("research", forcedProvider, forcedAccount);
+    if (aliases.length === 0) {
+      throw new AppError(
+        `research: no accounts configured under [research.account.*]. Add an account whose provider exposes the official research API (e.g. tavily, perplexity).`,
+        "RESEARCH_NO_ACCOUNTS",
+      );
+    }
+    let lastError: unknown;
+    let anyRegistered = false;
+    for (const alias of aliases) {
+      const provider = this.registry.getResearch(alias);
+      if (!provider) continue;
+      anyRegistered = true;
+      try {
+        return await provider.research(request, this.context);
+      } catch (error) {
+        lastError = error;
+        this.silentFailover(`orchestrator.research.provider_failed:${alias}`, error);
+      }
+    }
+    if (!anyRegistered) {
+      const providers = [...new Set(aliases.map((id) => this.config.research.account[id]?.provider).filter(Boolean))];
+      throw new AppError(
+        `research: configured account(s) use provider(s) that do not support the official research API: ${providers.join(", ") || "unknown"}. Use [research.account.*] with provider tavily or perplexity (see README).`,
+        "RESEARCH_UNSUPPORTED_PROVIDER",
+      );
+    }
+    const reason = lastError instanceof Error ? lastError.message : "no provider available";
+    throw new AppError(
+      `research: all configured research accounts failed (${reason}).\n  Tip: check .web/logs and [research.account.*].`,
+      "RESEARCH_ALL_FAILED",
+    );
   }
 
-  async researchMulti(
-    query: string,
-    maxSources: number,
-    providers: string[],
-  ): Promise<ProviderResponse> {
-    const searchResult = await this.searchMulti({ query, limit: maxSources }, providers);
-    const urls = searchResult.items.map((item) => item.url).filter((url): url is string => Boolean(url)).slice(0, maxSources);
-    if (urls.length === 0) return searchResult;
-    const fetched = await this.fetch({ urls });
-    const merged = {
-      provider: `research(${searchResult.provider}+${fetched.provider})`,
-      items: [
-        {
-          title: query,
-          content: fetched.items.map((item) => `${item.url ?? ""}\n${item.content ?? item.snippet ?? ""}`).join("\n\n"),
-          source: "research",
-        },
-      ],
-      raw: { search: searchResult.raw, fetch: fetched.raw },
-    };
-    return merged;
+  async researchMulti(request: ResearchRequest, providers: string[]): Promise<ProviderResponse> {
+    const tasks = providers.map(async (name) => {
+      const aliases = this.resolveCandidates("research", name);
+      for (const alias of aliases) {
+        const provider = this.registry.getResearch(alias);
+        if (!provider) continue;
+        return provider.research(request, this.context);
+      }
+      throw new AppError(`research: no registered research provider for: ${name}`, "PROVIDER_NOT_FOUND");
+    });
+    return this.mergeMulti(tasks, "research");
   }
 
   private async mergeMulti(
@@ -208,7 +226,7 @@ export class Orchestrator {
   }
 
   private resolveCandidates(
-    groupName: "search" | "fetch" | "answer",
+    groupName: GroupName,
     forcedProvider?: string,
     forcedAccount?: string,
   ): string[] {

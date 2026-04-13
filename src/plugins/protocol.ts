@@ -1,5 +1,5 @@
 import type { ModelConfig } from "../config/types";
-import type { AnswerProvider, FetchProvider, SearchProvider } from "../providers/types";
+import type { AnswerProvider, FetchProvider, ResearchProvider, SearchProvider } from "../providers/types";
 
 export interface ProviderModelBinding {
   alias: string;
@@ -10,6 +10,7 @@ export interface ProviderFactory {
   createSearch?(binding: ProviderModelBinding): SearchProvider;
   createFetch?(binding: ProviderModelBinding): FetchProvider;
   createAnswer?(binding: ProviderModelBinding): AnswerProvider;
+  createResearch?(binding: ProviderModelBinding): ResearchProvider;
 }
 
 export interface PluginRegistrationApi {

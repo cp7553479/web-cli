@@ -1,7 +1,56 @@
+/** English default for ~/.web/README.md */
 export function defaultWebHomeReadme(): string {
-  return `# ~/.web 配置目录
+  return `[中文说明](README_CN.md)
 
-更完整的说明（含多账号与 \`--account\` 的进阶用法）见**你安装本 CLI 时的仓库根目录**里的 \`README.md\`。
+# ~/.web configuration directory
+
+For the full manual (multi-account, \`--account\`, advanced usage), see the repository where you installed this CLI: \`README.md\` (English) and \`README_CN.md\` (Chinese).
+
+## Files
+
+- \`config.toml\` — \`[search|fetch|answer|research]\` and \`[*.account.accountId]\` (CLI loads **~/.web** first, then deep-merges **./.web** in the current directory).
+- \`.env\` — API keys (do not commit; repo template is \`init/.env.example\`, copied to \`~/.web/.env\` by \`web onboard init\`).
+- \`skills/web-cli/\` — Agent skill docs synced on onboard (same source as \`init/skills/web-cli\` in the repo).
+- \`plugins/\` — External plugin packages.
+
+## Environment placeholders
+
+In \`config.toml\`, \`api_token = "\${TAVILY_API_KEY}"\` reads from the environment; values live in \`.env\` or exported shell variables.
+
+## Multi-account try order
+
+Under each capability (e.g. \`[search]\`), define multiple \`[search.account.xxx]\` blocks. **First in file is tried first**; on failure (timeout, error), the next runs silently until success or exhaustion.
+
+- **Same vendor, multiple accounts:** same \`provider\`, different account ids (e.g. two Tavily keys); order is failover order.
+- **CLI narrowing:**
+  - \`web search "q" --provider tavily\`: only accounts with \`provider = tavily\` in that section, **in config order**.
+  - \`web search "q" --account tavily-backup\`: exactly one account; with \`--provider tavily\`, the account must belong to that vendor.
+  - Same idea for \`web fetch …\`, \`web answer "…"\` (\`answer\` uses a **positional** question, not \`--query\`).
+- **Do not mix:** \`--providers a b\` (multi concurrent) with \`--account\`.
+
+## Project overrides
+
+Create \`./.web/config.toml\` (and optional \`./.web/.env\`) at the repo root: **deep-merge** over global; keys present in the project win.
+
+## Common commands
+
+\`\`\`bash
+web config list
+web search "query"
+web fetch https://example.com
+web answer "your question"
+web onboard
+\`\`\`
+`;
+}
+
+/** Chinese companion for ~/.web/README_CN.md */
+export function defaultWebHomeReadmeCn(): string {
+  return `[English](README.md)
+
+# ~/.web 配置目录
+
+更完整的说明（含多账号与 \`--account\` 的进阶用法）见**你安装本 CLI 时的仓库根目录**里的 \`README.md\`（英文）与 \`README_CN.md\`（中文）。
 
 ## 文件
 
@@ -12,7 +61,7 @@ export function defaultWebHomeReadme(): string {
 
 ## 环境变量占位
 
-\`config.toml\` 中 \`api_token = "{$TAVILY_API_KEY}"\` 表示从环境变量读取；值写在 \`.env\` 或导出到 shell。
+\`config.toml\` 中 \`api_token = "\${TAVILY_API_KEY}"\` 表示从环境变量读取；值写在 \`.env\` 或导出到 shell。
 
 ## 多账号与尝试顺序
 

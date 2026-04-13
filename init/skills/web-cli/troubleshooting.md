@@ -38,6 +38,6 @@
 
 `<cwd>/.web/logs/*.log` 含 `http.request` / `http.response` 与用户指令。关闭日志：`config.toml` 里 `[runtime] logging = false`。
 
-## 8) 自动化 / 多套配置
+## 8) 仓库内跑 `npm test`
 
-导出 **`WEB_HOME`** 指向单独目录可替代 `~/.web` 作为全局配置根（与仓库 `tests/integration` 用法一致）。本地开发密钥可放在仓库根目录 **`.env.local`**（勿提交 git）；Vitest 会在跑测试前加载该文件。
+集成测在**仓库根**启动 CLI，配置与密钥来自 **`~/.web` 与 `./.web` 合并**；密钥放在 `./.web/.env` 或 `~/.web/.env`，勿提交。外网烟测：`WEB_RUN_JINA_SMOKE=1`（Jina search）、`WEB_RUN_FETCH_HTTP_SMOKE=1`（http fetch）。

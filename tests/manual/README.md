@@ -1,11 +1,14 @@
-# 手工 / 半自动脚本
+[中文文档](README_CN.md)
 
-本目录用于逐项 shell 验证（与 `npm test` 中的 Vitest 互补）。
+# Manual / semi-automated scripts
 
-**建议每次只跑一个脚本**，便于对照 **`<cwd>/.web/logs/`** 里的请求与响应排障。
+This directory holds one-off shell checks (complementary to Vitest under `npm test`).
 
-| 场景 | 建议 |
+**Run one script at a time** when possible so logs under **`<cwd>/.web/logs/`** are easy to correlate.
+
+| Scenario | Tip |
 |------|------|
-| 项目覆写 | 在临时目录建 `.web/config.toml` 片段，结合日志与 `web config list` 核对合并来源 |
+| Project overrides | Use a temp tree with a `.web/config.toml` slice; cross-check merge with logs and `web config list` |
+| Jina search smoke | Vitest needs **`WEB_RUN_JINA_SMOKE=1`** and a valid **`JINA_API_KEY`** to hit the network |
 
-脚本内 `ROOT` 指向仓库根目录（`tests/manual/` 的上两级）。
+Scripts set `ROOT` to the repository root (two levels above `tests/manual/`).

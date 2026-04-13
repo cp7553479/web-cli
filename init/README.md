@@ -1,18 +1,20 @@
-# init 模板
+[中文文档](README_CN.md)
 
-`web onboard init` 会将本目录下的 `config.toml` 与 `.env.example` 复制到 `~/.web/`（密钥模板在目标机命名为 `.env`；可用 `--force` 覆盖已有文件）。运行时可再由项目目录的 `./.web/config.toml`、`.env` **深度合并**覆写全局。
+# Init templates
 
-## 多账号与同厂商 failover
+`web onboard init` copies `config.toml` and `.env.example` from this directory into `~/.web/` (the env template becomes `~/.web/.env`; use `--force` to overwrite existing files). At runtime, `./.web/config.toml` and `./.web/.env` under a project **deep-merge** over the global home config.
 
-在每个能力段（`[search]`、`[fetch]`、`[answer]`）下可写多条 `[*.account.账号id]`。**文件中声明顺序即运行时尝试顺序**：前一条失败会静默换下一个，直到成功或全部失败。
+## Multi-account and same-vendor failover
 
-同一 `provider` 可配多条不同 `账号 id`（例如两个 Tavily key），实现密钥池轮换。
+Under each capability (`[search]`, `[fetch]`, `[answer]`, `[research]`) you can define multiple `[*.account.accountId]` blocks. **Declaration order is try order**: failures fall through silently until one succeeds or all fail.
 
-## CLI 与配置的关系
+Multiple blocks with the same `provider` but different account ids (e.g. two Tavily keys) implement a key pool / rotation.
 
-- `web search|fetch|answer … --provider <账号id或厂商名>`：缩小到单条账号，或到「该厂商」下按配置顺序的多条账号。
-- `web … --account <账号id>`：固定只用这一条；可与 `--provider` 组合做厂商校验。
-- `web search|answer|research … --providers a b` 为**多路并发**，**不可**与 `--account` 同用。
-- `web answer` 的问题为**位置参数**（`web answer "问题"`），不是 `--query`。
+## CLI vs config
 
-更完整的说明见仓库根目录 `README.md`。
+- `web search|fetch|answer|research … --provider <accountId or vendor>`: narrow to one account, or to all accounts for that vendor in file order.
+- `web … --account <accountId>`: pin exactly one account; optional `--provider` checks the vendor.
+- `web search|answer|research … --providers a b` is **multi concurrent**; **cannot** be combined with `--account`.
+- `web answer` takes the question as a **positional** argument (`web answer "question"`), not `--query`.
+
+Full manual: repository root [README.md](../README.md) / [README_CN.md](../README_CN.md).

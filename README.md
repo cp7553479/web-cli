@@ -1,125 +1,140 @@
-# Web CLI 使用手册
+[中文文档](README_CN.md)
 
-一条命令搞定「搜网页、抓内容、查资料、问答」。
+# Web CLI User Guide
 
-你只需要配一次 `~/.web`，以后在任何目录执行 `web search …` / `web fetch …` 就能用——不管是你自己敲命令，还是 AI Agent 帮你调。
+One command for **search**, **fetch**, **research**, and **answer**.
 
----
-
-## 目录
-
-- [为什么需要这个工具](#为什么需要这个工具)
-- [能做什么（功能总览）](#能做什么功能总览)
-- [安装](#安装)
-- [首次配置](#首次配置)
-- [配置怎么写](#配置怎么写)
-- [所有命令通用的选项](#所有命令通用的选项)
-- [命令详解](#命令详解)
-  - `[web search` — 搜网页](#web-search--搜网页)
-  - `[web fetch` — 抓网页内容](#web-fetch--抓网页内容)
-  - `[web research` — 搜完再抓，合在一起给你](#web-research--搜完再抓合在一起给你)
-  - `[web answer` — 直接给答案](#web-answer--直接给答案)
-  - `[web config` — 管理配置](#web-config--管理配置)
-  - `[web onboard` — 首次配置向导](#web-onboard--首次配置向导)
-  - `[web plugins` — 查看已装的插件](#web-plugins--查看已装的插件)
-- [多源并发搜索](#多源并发搜索)
-- [输出格式](#输出格式)
-- [日志记录](#日志记录)
-- [Inject Prompt（注入提示文字）](#inject-prompt注入提示文字)
-- [出问题了怎么排查](#出问题了怎么排查)
-- [内置支持的服务商](#内置支持的服务商)
-- [更多文档](#更多文档)
+Configure `~/.web` once, then run `web search …`, `web fetch …`, `web answer …`, or `web research …` from any directory. The `web` CLI talks to each vendor’s **official HTTP APIs** only (no local “search then fetch stitched into research” orchestration).
 
 ---
 
-## 为什么需要这个工具
+## Table of contents
 
-假设你用过 AI Agent（比如 Claude、Cursor Agent 等），它们「搜网页」「抓网页」靠的是 Tavily、Brave、Jina 这类第三方服务。
-
-问题是：
-
-- **每个 Agent 各自接一家**——你在 A 工具里配了 Tavily 密钥，到 B 工具又得重新配一遍。
-- **某家 API 挂了或额度用完**，没有备选，直接失败。
-
-这个 CLI 就是来解决这个问题的：
-
-1. **配一次，到处用**。把你的 API 密钥统一放在 `~/.web/` 目录，所有工具共享。
-2. **可以配多家**。比如搜索同时配 Jina 和 Tavily，第一家失败会自动试下一家。
-3. **密钥不写进配置文件**。配置文件里只写一个占位符 `{$TAVILY_API_KEY}`，真正的密钥放在单独的 `.env` 文件里，安全、方便。
-
----
-
-## 能做什么（功能总览）
-
-
-| 你想做什么       | 命令                                 | 一句话说明                                  |
-| ----------- | ---------------------------------- | -------------------------------------- |
-| 搜网页         | `web search "关键词"`                 | 像用搜索引擎一样，返回标题、链接、摘要。                   |
-| 抓某个网页的内容    | `web fetch https://…`              | 给一个或多个网址，把正文拉回来。                       |
-| 先搜再抓，汇总给我   | `web research "问题"`                | 先搜索 → 拿到链接 → 抓取正文 → 合并输出。              |
-| 问一个问题，直接要答案 | `web answer "问题"`                  | 调 DuckDuckGo / Brave / Gemini 等即时问答接口。 |
-| 同时用多家搜索     | `web search "关键词" --providers a b` | 并发请求多个搜索源，合并所有结果一起返回。                  |
-| 看 / 改我的配置   | `web config …`                     | 查看当前配置、增删服务商、调整优先级。                    |
-| 第一次初始化      | `web onboard …`                    | 帮你创建 `~/.web/` 目录和模板文件。                |
-| 看装了哪些插件     | `web plugins list`                 | 列出额外安装的插件。                             |
-
-
-**自动容错**：搜索、抓取、问答，都会按你配的顺序 **逐个试**。前一个服务挂了，自动换下一个，全挂才报错。中间的失败不会输出到屏幕，只记录在日志里。
+- [Why this tool](#why-this-tool)
+- [What it does](#what-it-does)
+- [Install](#install)
+- [First-time setup](#first-time-setup)
+- [Configuration](#configuration)
+- [Global CLI options](#global-cli-options)
+- [Commands](#commands)
+  - `[web search](#web-search--web-search)`
+  - `[web fetch](#web-fetch--web-fetch)`
+  - `[web research](#web-research--web-research)`
+  - `[web answer](#web-answer--web-answer)`
+  - `[web config](#web-config--web-config)`
+  - `[web onboard](#web-onboard--web-onboard)`
+  - `[web plugins](#web-plugins--web-plugins)`
+- [Multi-provider concurrency](#multi-provider-concurrency)
+- [Output formats](#output-formats)
+- [Logging](#logging)
+- [Inject prompt](#inject-prompt)
+- [Troubleshooting](#troubleshooting)
+- [Built-in providers](#built-in-providers)
+- [More documentation](#more-documentation)
 
 ---
 
-## 安装
+## Why this tool
+
+AI agents often rely on Tavily, Brave, Jina, and similar services for “search” and “fetch”.
+
+Problems:
+
+- **Each tool wires its own vendor** — you configure Tavily in tool A, then again in tool B.
+- **When an API is down or quota is gone**, there is no fallback; the call just fails.
+
+This CLI addresses that by:
+
+1. **Configure once, reuse everywhere.** Put API keys under `~/.web/` and share them across tools.
+2. **Multiple vendors per capability.** For example, configure both Jina and Tavily for search; if the first fails, the next is tried automatically.
+3. **Secrets stay out of TOML.** Use placeholders like `{$TAVILY_API_KEY}` in `config.toml` and real values in a separate `.env` file.
+
+---
+
+## What it does
+
+
+| Goal                         | Command                              | One-line summary                                                                         |
+| ---------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Web search                   | `web search "query"`                 | Search-style results: title, URL, snippet.                                               |
+| Page content                 | `web fetch https://…`                | One or more URLs; body / extracted content returned.                                     |
+| Deep research (official API) | `web research "question"`            | Vendor **research** endpoints (e.g. Tavily `/research`, Perplexity Sonar deep research). |
+| Direct answers               | `web answer "question"`              | DuckDuckGo / Brave / Gemini / etc. instant-answer style APIs.                            |
+| Multi-source search          | `web search "query" --providers a b` | Concurrent requests; merged results.                                                     |
+| View / edit config           | `web config …`                       | List config, add or remove accounts, change order.                                       |
+| First-time bootstrap         | `web onboard …`                      | Create `~/.web/` and template files.                                                     |
+| List plugins                 | `web plugins list`                   | External plugins only.                                                                   |
+
+
+**Automatic failover:** search, fetch, answer, and research all try accounts **in order**. The next account runs if the previous errors or times out; you only see an error if all fail. Intermediate failures are not printed to the terminal; they go to the log file.
+
+### The four capabilities (mapped to vendor APIs)
+
+
+| Capability   | Meaning                                       | CLI            |
+| ------------ | --------------------------------------------- | -------------- |
+| **search**   | Internet search, LLM-oriented hits            | `web search`   |
+| **fetch**    | Page body / extraction, LLM-oriented          | `web fetch`    |
+| **answer**   | Vendor-side answer after retrieval / browsing | `web answer`   |
+| **research** | Deeper “research” class APIs from vendors     | `web research` |
+
+
+Each subcommand **only** calls endpoints documented for that capability; `web research` does **not** chain `web search` → `web fetch` inside the CLI. Extra body fields go through `--vendor key=value` (repeatable). On `search` / `answer` / `research` you may also pass unregistered `--name value` or `--name=value` (merged with `--vendor`; **same key: `--vendor` wins**). Only **allowlisted** keys per vendor are sent; others are ignored. Shared CLI names: `--country`, `--site` / `--sites`, `--safesearch` (search); unsupported fields are ignored per vendor.
+
+**Multiple `--providers`:** still **separate** official API calls per provider, then client-side merge (different semantics from a single endpoint; see [Multi-provider concurrency](#multi-provider-concurrency)).
+
+---
+
+## Install
 
 ```bash
-git clone <本仓库地址>
+git clone <this-repo-url>
 cd web
 npm install
 npm run build
 ```
 
-装完后让系统认识 `web` 命令：
+Register the `web` command globally:
 
 ```bash
 npm link
 ```
 
-这会把 `web` 注册为全局命令，之后在任何目录都能直接敲 `web …`。
-
-试一下装好了没有：
+Verify:
 
 ```bash
-web --help           # 看总帮助
-web search --help    # 看 search 的帮助
+web --help
+web search --help
 ```
 
 ---
 
-## 首次配置
+## First-time setup
 
-安装好 CLI 后，需要初始化一个配置目录 `~/.web/`（在你的用户主目录下，比如 `/Users/你的名字/.web/`）。
+After install, initialize `~/.web/` under your home directory (e.g. `/Users/you/.web/`).
 
-**最快的方式——一键复制模板**：
+**Fast path — copy templates:**
 
 ```bash
 web onboard init
 ```
 
-这会把仓库里 `init/config.toml` 与 `init/.env.example` 复制到 `~/.web/`（环境变量文件落盘为 `~/.web/.env`）。
+This copies `init/config.toml` and `init/.env.example` from the repo into `~/.web/` (env file becomes `~/.web/.env`).
 
-然后：
+Then:
 
-1. 打开 `~/.web/.env`，把你有的 API 密钥填进去。默认模板启用了 Jina 的 search 与 fetch，**至少需要**填写 `JINA_API_KEY`（申请地址见 `init/config.toml` 或 `init/.env.example` 顶部列表）；其他厂商按需填写。
-2. 打开 `~/.web/config.toml`，按需取消注释模板里的 `[*.account.*]` 段，并把对应项的 `enabled` 改成 `true`。
+1. Edit `~/.web/.env` with your API keys. The default template enables Jina search and fetch; you need at least `**JINA_API_KEY**` (see links at the top of `init/config.toml` or `init/.env.example`). Add other vendors as needed.
+2. Edit `~/.web/config.toml`: uncomment `[*.account.*]` blocks you want and set `enabled = true`.
 
-**如果你更喜欢交互式一步步选**：
+**Interactive wizard:**
 
 ```bash
 web onboard
 ```
 
-会弹出一个选择界面，让你勾选想用哪些服务、填密钥，最后帮你写好文件。（需要在终端里跑，不能在脚本或自动化流程里用。）
+TTY multi-select and prompts; writes only under `~/.web/`. Not for scripts or CI.
 
-**如果已经配过，想重新来**：
+**Re-initialize:**
 
 ```bash
 web onboard init --force
@@ -127,405 +142,373 @@ web onboard init --force
 
 ---
 
-## 配置怎么写
+## Configuration
 
-### 配置文件放在哪
-
-
-| 文件位置                 | 说明                                         |
-| -------------------- | ------------------------------------------ |
-| `~/.web/config.toml` | **主配置**：写清楚你用哪些搜索/抓取/问答服务、先试谁后试谁。          |
-| `~/.web/.env`        | **密钥文件**：你的 API Key 都放这里，不要写进 config.toml。 |
+### Where files live
 
 
-还有一个可选的「项目级配置」——如果某个项目想用不同的设置：
+| Path                 | Role                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| `~/.web/config.toml` | **Primary config:** which search/fetch/answer/research accounts and in what order. |
+| `~/.web/.env`        | **Secrets:** API keys here, not inside `config.toml`.                              |
 
 
-| 文件位置                 | 说明                                         |
-| -------------------- | ------------------------------------------ |
-| `./.web/config.toml` | 放在项目根目录的 `.web/` 下。这里写的会 **覆盖** 全局配置里的同名项。 |
-| `./.web/.env`        | 同上，项目密钥覆盖全局密钥。                             |
+Optional **project overrides:**
 
-### `WEB_HOME`（可选）
 
-若环境变量 **`WEB_HOME`** 为非空字符串，CLI 将其解析为**绝对路径**后作为全局配置根目录使用（替代 `~/.web`），用于脚本、CI 或多套配置隔离。该目录下仍为 `config.toml`、`.env`、`plugins/` 等布局。仓库内自动化测试会结合临时 `WEB_HOME` 与根目录 `.env.local`（由 Vitest 加载，勿提交）跑集成用例。
+| Path                 | Role                                                               |
+| -------------------- | ------------------------------------------------------------------ |
+| `./.web/config.toml` | Under project root; **deep-merges** over global; project keys win. |
+| `./.web/.env`        | Project env overrides global for same variable names.              |
 
-> `web onboard init` 在设置了 `WEB_HOME` 时会把模板写入该目录；`onboard` 同步 Agent skills 到 `~/.agent/skills` 等路径的逻辑仍基于用户主目录，与 `WEB_HOME` 无关。
 
-> 想看模板文件的逐行解释，请直接打开仓库里的 `init/config.toml` 和 `init/.env.example`，里面有非常详细的中文注释。
+`**npm test`** integration tests run the CLI from the **repository root**, matching project-level `./.web` above; you need a working `~/.web` (and `./.web` if you use it). External smoke tests require `**WEB_RUN_JINA_SMOKE=1`** (Jina search) and `**WEB_RUN_FETCH_HTTP_SMOKE=1**` (`http` fetch); otherwise those cases are skipped.
 
-### config.toml 的基本结构
+> For line-by-line template commentary, open `init/config.toml` and `init/.env.example` in the repo (detailed Chinese comments).
 
-config.toml 分成四大块，对应四种能力：
+### `config.toml` layout
+
+Four capability sections plus runtime:
 
 ```toml
-[search]          # 搜索能力
-[fetch]           # 抓取能力
-[research]        # 深度研究（目前实际用的是 search 的配置，见下文说明）
-[answer]          # 即时问答能力
-[runtime]         # 运行期开关
+[search]
+[fetch]
+[research]        # Official research APIs only; [research.account.*]
+[answer]
+[runtime]
 ```
 
-每个能力下面主要是 `**[group.account.账号id]**` 一段段配置。
+Under each capability you mostly have `**[group.account.accountId]**` blocks.
 
-- `**账号 id**`（表头最后一段，例如 `[search.account.perplexity-main]` 里的 `perplexity-main`）是本工具内部的标识，用来区分多条配置；你可以自定义命名。
-- **同一厂商多账号**：可写多行相同 `provider`、不同 `账号 id`（例如两个 Tavily key），按文件中声明顺序依次尝试，实现自动切换。
-- **尝试顺序**：在文件里谁先出现，谁就先试；前一个失败（出错、超时等）再试下一个，直到成功或全部试完。
-- **CLI**：`--provider <厂商名或账号id>` 可把尝试范围缩到该厂商（按上面顺序在**同厂商**账号间 failover），或直指某条账号 id。`--account <账号id>` 固定只用这一条；若与 `--provider` 同用，会校验该账号是否属于该厂商。`--providers`（多路并发）不能与 `--account` 同用。
+- `**accountId**` (last segment of the header, e.g. `perplexity-main` in `[search.account.perplexity-main]`) is an internal alias; name it however you like.
+- **Same vendor, multiple accounts:** multiple blocks with the same `provider` but different `accountId` (e.g. two Tavily keys); order in file is try order / failover.
+- **Try order:** first block in file is tried first; on failure, the next runs until success or exhaustion.
+- **CLI:** `--provider <vendor or accountId>` limits tries to that vendor (failover among its accounts in file order) or pins one account id. `--account <accountId>` uses exactly one account; with `--provider`, the account must belong to that vendor. `--providers` (multi) cannot be used with `--account`.
 
-`provider` 字段填**厂商名**（如 `jina`、`kimi`、`brave`），CLI 根据当前命令上下文（`web search` / `web fetch` / `web answer`）自动选用该厂商对应的子组件。同一个厂商可以同时出现在 search、fetch、answer 等不同能力段里。
+`provider` is the **vendor name** (e.g. `jina`, `kimi`, `brave`). The CLI picks the implemented sub-component for the current command (`web search` / `web fetch` / `web answer` / `web research`). A vendor may appear in multiple sections; if it has no implementation for a section, that account is not registered and is skipped during failover.
 
-举个完整例子：
+Example:
 
 ```toml
 [search]
 
-# Jina Search：需要 JINA_API_KEY（申请见 init/config.toml 顶部链接）
 [search.account.jina-main]
 provider = "jina"
 api_token = "{$JINA_API_KEY}"
 enabled = true
 
-# Tavily：需要 TAVILY_API_KEY（写在后面，作为备选）
 [search.account.tavily-main]
 provider = "tavily"
 api_token = "{$TAVILY_API_KEY}"
 enabled = false
 ```
 
-想改优先级时：**在编辑器里整块移动** `[search.account.xxx]` 的位置即可，不用单独维护别的字段。
+To change priority: **move whole `[search.account.xxx]` blocks** in the editor; no separate priority field.
 
-### 密钥占位符 `{$XXX}` 是怎么回事
+### Placeholders `{$VAR}`
 
-配置里写 `api_token = "{$TAVILY_API_KEY}"` 意思是：**启动时去找一个叫 `TAVILY_API_KEY` 的环境变量，用它的值替换这里**。
+`api_token = "{$TAVILY_API_KEY}"` means: **at startup**, substitute the value of environment variable `TAVILY_API_KEY`.
 
-程序会按这个顺序找：
+Resolution order:
 
-1. 系统已有的环境变量（`export TAVILY_API_KEY=xxx` 那种）
-2. `~/.web/.env` 文件里写的
-3. `./.web/.env`（项目级，如果有的话，会覆盖上面的）
+1. Existing process env (`export TAVILY_API_KEY=…`)
+2. `~/.web/.env`
+3. `./.web/.env` (project; overrides above for same names)
 
-**重要**：只有 `enabled = true` 的服务才会去找密钥。如果一个服务的 `enabled = false`，占位符不会被解析，密钥可以不填。
+**Note:** only accounts with `enabled = true` resolve tokens. If `enabled = false`, placeholders are not required.
 
-### 关于 `[research]` 这个段
+### `[research]`
 
-config.toml 里虽然有 `[research]` 段，`web onboard` 向导也会帮你填它，但**目前 `web research` 命令实际跑的时候只用 `[search]` 的配置去检索**。所以如果你想调搜索行为，改 `[search]` 就对了。`[research]` 目前是预留的，以后可能会启用。
+`web research` reads `**[research.account.*]`** only. Configure vendors that expose an official **research** API (built-in: **tavily**, **perplexity**). Do not put search-only vendors here or you will get “no research accounts” style errors.
 
 ---
 
-## 所有命令通用的选项
+## Global CLI options
 
-这些选项放在 `web` 和子命令之间。比如：
+These go between `web` and the subcommand:
 
 ```bash
 web --timeout-ms 30000 search "query"
-#    ^^^^^^^^^^^^^^^^^^
-#    全局选项              search 是子命令
 ```
 
 
-| 选项                  | 默认值     | 干什么用的                                                     |
-| ------------------- | ------- | --------------------------------------------------------- |
-| `-f, --format <格式>` | `text`  | 输出格式。可选 `text`（给人看）、`json`（给程序解析）、`markdown`（适合粘贴到文档）。    |
-| `--max-length <数字>` | `10000` | 输出最多多少个字符。超出会截断，末尾提示 `[truncated]`。                       |
-| `--timeout-ms <毫秒>` | `15000` | 每次请求最多等多久。默认 15 秒。如果网络慢或者抓取大页面，可以调大。                      |
-| （无 stderr 调试开关） | —       | 请求/响应与指令在 **`runtime.logging` 未关闭** 时写入 **`<当前目录>/.web/logs/*.log`**。 |
+| Option                 | Default | Purpose                                                                                           |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `-f, --format <fmt>`   | `text`  | `text`, `json`, or `markdown`.                                                                    |
+| `--max-length <n>`     | `10000` | Max output characters; tail shows `[truncated]` if cut.                                           |
+| `--timeout-ms <n>`     | `15000` | Per-request timeout (default 15s).                                                                |
+| (no stderr debug flag) | —       | When `**runtime.logging**` is on (default), requests/responses go to `**<cwd>/.web/logs/*.log**`. |
 
 
 ---
 
-## 命令详解
+## Commands
 
-### `web search` — 搜网页
+### `web search` — web search
 
 ```bash
-web search "你想搜的内容"
+web search "your query"
 ```
 
-就像用搜索引擎：输入关键词，返回标题、链接、摘要。
+Search-style results: titles, URLs, snippets.
 
 
-| 选项                            | 说明                                                     |
-| ----------------------------- | ------------------------------------------------------ |
-| `--site github.com npmjs.com` | 只搜这几个网站（可以写多个，空格分隔）。                                   |
-| `--limit 10`                  | 最多返回几条结果，默认 5。                                         |
-| `--freshness day`             | 只要最近的内容。可选 `day`（一天内）、`week`、`month`、`year`。不是所有服务都支持。 |
-| `--language zh`               | 按语言过滤（不是所有服务都支持）。                                      |
-| `--region CN`                 | 按地区过滤（不是所有服务都支持）。                                      |
-| `--provider xxx`              | 指定用哪个服务（账号 id 或厂商名）。不写就按配置顺序来。                             |
-| `--account xxx`               | 固定只用该账号 id；可与 `--provider` 组合做厂商校验。不可与 `--providers` 同用。          |
-| `--providers a b c`           | 同时用多个服务并发搜索，合并返回结果。详见 [多源并发搜索](#多源并发搜索)。               |
+| Option                        | Purpose                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `--site github.com npmjs.com` | Restrict to these sites (space-separated).                                                             |
+| `--sites …`                   | Same as `--site`; can repeat groups.                                                                   |
+| `--country US`                | Unified country/region (mapped if supported).                                                          |
+| `--countries US CA`           | Multiple countries; concatenated for `country` if supported.                                           |
+| `--safesearch strict`         | Safe search level if supported.                                                                        |
+| `--vendor k=v`                | Native vendor fields; repeat; allowlist only.                                                          |
+| `--include_answer true` etc.  | Unregistered `--officialField` merges into vendor; `--vendor` wins on conflict.                        |
+| `--limit 10`                  | Max results (default 5).                                                                               |
+| `--freshness day`             | Recency: `day`, `week`, `month`, `year` (not all vendors).                                             |
+| `--language zh`               | Language filter if supported.                                                                          |
+| `--region CN`                 | Region filter if supported.                                                                            |
+| `--provider xxx`              | Account id or vendor name; default is file order.                                                      |
+| `--account xxx`               | Single account id; optional vendor check with `--provider`. Mutually exclusive with `--providers`.     |
+| `--providers a b c`           | Concurrent multi-source; merged output. See [Multi-provider concurrency](#multi-provider-concurrency). |
 
 
-示例：
+Examples:
 
 ```bash
-# 搜 Node.js CLI 框架，只看 GitHub 和 npm，要 8 条
 web search "nodejs cli framework" --site github.com npmjs.com --limit 8
-
-# 用 Tavily 搜，输出 Markdown 格式
-web search "AI 搜索 API" --provider tavily-main -f markdown
-
-# 固定使用某条账号（可与 --provider 一起校验厂商）
-web search "AI 搜索 API" --provider kimi --account kimi-main
-
-# 同时用 Jina 和 Tavily 搜，合并结果
+web search "AI search API" --provider tavily-main -f markdown
+web search "AI search API" --provider kimi --account kimi-main
 web search "AI news 2026" --providers jina-main tavily-main
-
-# 出问题了？看当前目录下 .web/logs/ 里的日志文件
 web search "test query"
 ```
 
 ---
 
-### `web fetch` — 抓网页内容
+### `web fetch` — fetch page content
 
 ```bash
 web fetch https://example.com
 ```
 
-给一个或多个网址，把网页正文内容拉回来。
-
-| 你加的选项 | 会怎么抓 |
-| ----- | --- |
-| 什么都不加 | **默认**：按 `[fetch.account.*]` 声明顺序依次尝试各条 fetch 账号（含 `html2markdown`、`http`、`playwright` 等，取决于你的配置）。 |
-| `--provider xxx` | 指定账号 id，或厂商名（则在该厂商的多条账号中按声明顺序依次尝试）。 |
-| `--account xxx` | 固定只用该账号 id；可与 `--provider` 一起校验厂商。 |
-
-| 选项                         | 说明                                                                  |
-| -------------------------- | ------------------------------------------------------------------- |
-| `--wait-until load`        | 厂商 `playwright` 时：等到 `load`（默认）、`domcontentloaded` 或 `networkidle`。 |
-| `--provider xxx`           | 指定账号 id 或厂商名。                                                     |
-| `--account xxx`            | 指定账号 id。                                                         |
-| `--selector "div.article"` | 只提取页面中匹配该 CSS 选择器的部分（Playwright 等模式下生效）。                            |
+One or more URLs; returns extracted body content.
 
 
-**html2markdown**：默认模板里通常靠前。内置 HTML→Markdown 转换引擎，无需密钥。
+| Options          | Behavior                                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| (none)           | **Default:** try `[fetch.account.*]` in file order (`html2markdown`, `http`, `playwright`, etc. per your config). |
+| `--provider xxx` | Account id or vendor name (failover among that vendor’s accounts in order).                                       |
+| `--account xxx`  | Exactly one account; optional `--provider` vendor check.                                                          |
 
-**结果过长时**：如果抓取结果超过 10,000 字符，CLI 会自动把完整结果保存到 `.web/temp/` 目录下的 `.md` 文件，终端只输出文件路径提示。
 
-示例：
+
+| Option                     | Purpose                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `--wait-until load`        | For `playwright`: `load` (default), `domcontentloaded`, or `networkidle`. |
+| `--provider xxx`           | Account id or vendor.                                                     |
+| `--account xxx`            | Account id.                                                               |
+| `--selector "div.article"` | CSS selector slice (Playwright-capable paths).                            |
+
+
+**html2markdown:** often first in templates; local HTML→Markdown; no API key.
+
+**Long output:** if result exceeds 10,000 characters, full text is written under `.web/temp/*.md` and the terminal shows the path.
+
+Examples:
 
 ```bash
-# 默认：按 [fetch.account.*] 顺序尝试
 web fetch https://example.com
-
-# 用 Jina Reader 服务抓两个网址，输出 Markdown
 web fetch https://a.com https://b.com --provider jina-reader -f markdown
-
-# 用浏览器抓（适合 JS 渲染的页面），等到网络空闲
 web fetch https://news.ycombinator.com --provider playwright --wait-until networkidle
-
-# 用 html2markdown 提取文章正文
 web fetch https://example.com/article --provider html2markdown-main
 ```
 
 ---
 
-### `web research` — 搜完再抓，合在一起给你
+### `web research` — official deep-research APIs
 
 ```bash
-web research "你想研究的问题"
+web research "your research question"
 ```
 
-这个命令自动完成三步：
-
-1. **搜索**：用你配置的搜索服务查关键词，拿到一堆链接。
-2. **抓取**：对搜到的前 N 个链接，逐个抓取正文。
-3. **合并**：把所有正文拼在一起，输出给你。
+Calls each account’s vendor **research** HTTP API (e.g. Tavily `POST /research` then poll `GET /research/{request_id}`; Perplexity `POST /chat/completions` with `sonar-deep-research` by default). **Does not** locally chain `web search` + `web fetch`.
 
 
-| 选项                  | 说明                                    |
-| ------------------- | ------------------------------------- |
-| `--max-sources 6`   | 最多抓几个链接的内容，默认 5。                      |
-| `--provider xxx`    | 搜索阶段用哪个服务（账号 id 或厂商名）。                 |
-| `--account xxx`     | 搜索阶段固定某条账号 id；不可与 `--providers` 同用。fetch 步仍按 `[fetch.account.*]` 默认链。 |
-| `--providers a b c` | 搜索阶段同时用多个服务并发搜索。详见 [多源并发搜索](#多源并发搜索)。 |
+| Option                   | Purpose                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `--max-sources 6`        | Vendor `limit` hint (semantics vary); default 5.                                                  |
+| `--vendor k=v`           | Extension fields; allowlist only (e.g. `--vendor model=sonar-pro`).                               |
+| `--model sonar-pro` etc. | Unregistered long flags merge into vendor; `--vendor` wins.                                       |
+| `--provider xxx`         | Account id or vendor under `[research.account.*]`.                                                |
+| `--account xxx`          | Single research account; not with `--providers`.                                                  |
+| `--providers a b c`      | Concurrent research calls; merged. See [Multi-provider concurrency](#multi-provider-concurrency). |
 
 
-示例：
+Examples:
 
 ```bash
-# 研究一个话题，抓 6 个来源，输出 Markdown
 web research "2026 Node.js CLI best practices" --max-sources 6 -f markdown
-
-# 用多个搜索源同时研究
-web research "AI agent frameworks 2026" --providers jina-main tavily-main
-
-# 指定搜索服务（详见 .web/logs 排障）
-web research "Jina Reader 限额" --provider jina-main
+web research "AI agent frameworks 2026" --providers tavily-main perplexity-main
 ```
 
 ---
 
-### `web answer` — 直接给答案
+### `web answer` — direct answers
 
 ```bash
-web answer "你的问题"
+web answer "your question"
 ```
 
-不是搜索——是直接问问题拿答案。比如 DuckDuckGo 的百科问答、Brave 的 AI 回答、Gemini 结合 Google 搜索给出的回答。
+Not “search results” — vendor **answer** endpoints: DuckDuckGo Instant Answer, Brave Answers, Gemini grounding, Perplexity Sonar (`chat/completions`), Tavily (search + `include_answer`), Firecrawl Interact (requires `--url`), etc.
 
 
-| 选项                  | 说明                                  |
-| ------------------- | ----------------------------------- |
-| `<query>`           | **位置参数**，问题全文。                      |
-| `--provider xxx`    | 用哪个问答服务（账号 id 或厂商名）。                 |
-| `--account xxx`     | 固定某条账号 id；不可与 `--providers` 同用。        |
-| `--providers a b c` | 同时用多个问答服务并发查询。详见 [多源并发搜索](#多源并发搜索)。 |
-| `--no-redirect`     | 给 DuckDuckGo 用的：不要跳转。               |
-| `--no-html`         | 给 DuckDuckGo 用的：去掉 HTML 标签。         |
-| `--skip-disambig`   | 给 DuckDuckGo 用的：跳过歧义消解。             |
+| Option              | Purpose                                                        |
+| ------------------- | -------------------------------------------------------------- |
+| `<query>`           | **Positional** query text.                                     |
+| `--url <url>`       | **Required for Firecrawl interact:** page URL to scrape first. |
+| `--vendor k=v`      | Extensions (e.g. `--vendor model=sonar-pro`).                  |
+| `--model …` etc.    | Unregistered flags merge into vendor; `--vendor` wins.         |
+| `--provider xxx`    | Account id or vendor.                                          |
+| `--account xxx`     | Single account; not with `--providers`.                        |
+| `--providers a b c` | Concurrent multi-answer; merged.                               |
+| `--no-redirect`     | DuckDuckGo: no redirect.                                       |
+| `--no-html`         | DuckDuckGo: strip HTML.                                        |
+| `--skip-disambig`   | DuckDuckGo: skip disambiguation.                               |
 
 
-示例：
+Examples:
 
 ```bash
 web answer "What is Rust?"
-web answer "今日新闻摘要" --provider gemini-main -f json
-
-# 同时向 DuckDuckGo 和 Brave 问，合并结果
+web answer "news summary" --provider gemini-main -f json
 web answer "AI trends" --providers ddg-main brave-answer
+web answer "extract above-the-fold price" --provider firecrawl-scrape --url https://example.com
 ```
 
 ---
 
-### `web config` — 管理配置
+### `web config` — manage configuration
 
-用命令行读写 `~/.web/config.toml`，不用手动编辑文件。（当然你手动编辑也完全可以。）
-
-
-| 命令                                           | 干什么                          |
-| -------------------------------------------- | ---------------------------- |
-| `web config list`                            | 看一下当前的完整配置（密钥会被打码显示，不用担心泄露）。 |
-| `web config set <组> <账号id> --provider <厂商名>` | 添加或修改一条 account。             |
-| `web config remove-model <组> <账号id>`         | 删掉一条 account。                |
+Read/write `~/.web/config.toml` from the CLI (manual edit is still fine).
 
 
-这里的 `<组>` 就是 `search`、`fetch`、`research`、`answer` 四选一。
-
-`set` 命令的选项：
-
-
-| 选项                     | 说明                                                                                                                           |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `--provider <厂商名>`     | **必填**。比如 `tavily`、`brave`、`jina`、`kimi`、`firecrawl`、`perplexity`、`gemini`、`duckduckgo`、`http`、`html2markdown`、`playwright`。 |
-| `--token <密钥>`         | API 密钥。可以直接写明文，也可以写占位符 `'{$TAVILY_API_KEY}'`（推荐）。                                                                            |
-| `--base-url <地址>`      | 如果这个服务你要连私有部署或其他地址，可以写在这里。一般不用填。                                                                                             |
-| `--enabled true/false` | 是否启用，默认 `true`。                                                                                                              |
+| Command                                                  | Purpose                           |
+| -------------------------------------------------------- | --------------------------------- |
+| `web config list`                                        | Show full config (tokens masked). |
+| `web config set <group> <accountId> --provider <vendor>` | Add or update an account.         |
+| `web config remove-model <group> <accountId>`            | Remove an account.                |
 
 
-示例：
+`<group>` is one of `search`, `fetch`, `research`, `answer`.
+
+`set` options:
+
+
+| Option                 | Purpose                                                                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--provider <vendor>`  | **Required.** e.g. `tavily`, `brave`, `jina`, `kimi`, `firecrawl`, `perplexity`, `gemini`, `duckduckgo`, `http`, `html2markdown`, `playwright`. |
+| `--token <secret>`     | API key; literal or `'{$TAVILY_API_KEY}'` (recommended).                                                                                        |
+| `--base-url <url>`     | Custom base URL if needed.                                                                                                                      |
+| `--enabled true/false` | Default `true`.                                                                                                                                 |
+
+
+Examples:
 
 ```bash
-# 看当前配置
 web config list
-
-# 加一个 Tavily 搜索服务
 web config set search tavily-main --provider tavily --token '{$TAVILY_API_KEY}'
-
-# 调整谁先谁后：直接编辑 ~/.web/config.toml，移动各 [search.account.*] 整块顺序
-
-# 删掉不用的
 web config remove-model search old-alias
 ```
 
 ---
 
-### `web onboard` — 首次配置向导
+### `web onboard` — first-time wizard
 
 
-| 命令                         | 说明                              |
-| -------------------------- | ------------------------------- |
-| `web onboard init`         | 把模板文件复制到 `~/.web/`。最简单直接，适合所有人。 |
-| `web onboard init --force` | 强制覆盖 `config.toml` / `.env`；`.env` 会先合并已有非空键再写回；并刷新 `~/.web/README.md`。 |
-| `web onboard`              | 打开交互式向导，一步步选服务、填密钥。（需要在终端里跑。）   |
+| Command                    | Purpose                                                                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `web onboard init`         | Copy templates to `~/.web/`.                                                                                            |
+| `web onboard init --force` | Overwrite `config.toml` / `.env` (merge non-empty env keys back); refresh `~/.web/README.md` and `~/.web/README_CN.md`. |
+| `web onboard`              | Interactive wizard (TTY).                                                                                               |
 
 
 ---
 
-### `web plugins` — 查看已装的插件
+### `web plugins` — list external plugins
 
 ```bash
 web plugins list
 ```
 
-列出 `~/.web/plugins/` 下安装的外部插件。
+Lists external packages under `~/.web/plugins/`.
 
-**普通用户不需要关心这个。** 内置的服务商（Brave、Tavily、Jina 等等）已经够用了，不需要装任何插件。这个功能是给想接入自己私有搜索服务的人准备的。
+**Most users do not need this.** Built-in vendors cover typical use; plugins are for custom/private integrations.
 
 ---
 
-## 多源并发搜索
+## Multi-provider concurrency
 
-`--providers` 是 `search`、`answer`、`research` 三个命令共有的能力。和 `--provider`（单数）的区别：
-
-
-|      | `--provider xxx`                | `--providers a b c`                    |
-| ---- | ------------------------------- | -------------------------------------- |
-| 行为   | 只用 `xxx` 这一个服务。如果失败，按配置顺序尝试下一个。 | 同时向 `a`、`b`、`c` 发起请求（并发），把所有成功的结果合并返回。 |
-| 适合场景 | 你确定用哪家，或者想指定优先的那家。              | 想要多家结果综合比较，比如同时看 Jina 和 Tavily 搜出来的东西。 |
-
-**`--account`** 只能与单路模式（`--provider` 或不指定并发）一起用；与 `--providers` **互斥**。
+`--providers` works for `search`, `answer`, and `research`. Compared to `--provider` (singular):
 
 
-`--providers` 后面跟的名字可以是：
+|          | `--provider xxx`                                                     | `--providers a b c`                                               |
+| -------- | -------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Behavior | Single logical choice; failover to next account in chain on failure. | Concurrent requests to `a`, `b`, `c`; merge successful responses. |
+| Use when | You want one primary line / vendor scope.                            | You want combined perspectives (e.g. Jina + Tavily).              |
 
-- **账号 id**（`config.toml` 里 `[search.account.这里]` 的名字），比如 `jina-main`、`tavily-main`。
-- **厂商名**（比如 `tavily`、`jina`），会自动找到对应的别名。
 
-**如果名字写错了**，CLI 会提示你可以用哪些：
+`**--account`** is only valid with single-path mode (`--provider` or default order), **not** with `--providers`.
+
+Names after `--providers` can be:
+
+- **Account id** (`[search.account.here]` segment), e.g. `jina-main`, `tavily-main`.
+- **Vendor name** (`tavily`, `jina`, …); resolves to matching accounts.
+
+Wrong names produce a hint:
 
 ```
 Unsupported provider 'xxx'. Available for search: jina-main, tavily-main, brave-main, jina, tavily, brave
 ```
 
-示例：
+Examples:
 
 ```bash
-# 搜索：同时用 Jina 和 Tavily
 web search "latest AI papers" --providers jina-main tavily-main
-
-# 问答：同时向 DuckDuckGo 和 Brave 问
-web answer "什么是量子计算" --providers ddg-main brave-answer
-
-# 深度研究：搜索阶段用多个源
-web research "2026 前端框架趋势" --providers jina-main tavily-main --max-sources 8
+web answer "what is quantum computing" --providers ddg-main brave-answer
+web research "2026 frontend trends" --providers jina-main tavily-main --max-sources 8
 ```
 
 ---
 
-## 输出格式
+## Output formats
 
-通过 `-f` 选项控制：
+`-f` / `--format`:
 
 
-| 格式         | 适合谁            | 长什么样                |
-| ---------- | -------------- | ------------------- |
-| `text`     | 人在终端看          | 编号列表，每条有标题、链接、摘要。   |
-| `markdown` | 复制到文档 / 笔记     | 用 Markdown 标题和列表排版。 |
-| `json`     | 给程序 / Agent 解析 | 标准 JSON 格式。         |
+| Format     | Best for          | Shape                                   |
+| ---------- | ----------------- | --------------------------------------- |
+| `text`     | Human terminal    | Numbered list with title, URL, snippet. |
+| `markdown` | Docs / notes      | Markdown headings and lists.            |
+| `json`     | Programs / agents | JSON.                                   |
 
 
 ```bash
 web search "hello" -f json
 web search "hello" -f markdown
-web search "hello"              # 默认 text
+web search "hello"
 ```
 
 ---
 
-## 日志记录
+## Logging
 
-默认开启，日志写入 `<当前目录>/.web/logs/` 目录，文件名格式 `YYYY-MM-DD-<id>.log`。日志记录用户指令、API 请求和响应。
+Default **on**. Logs go to `<cwd>/.web/logs/`, files like `YYYY-MM-DD-<id>.log`, including command line, requests, and responses.
 
-关闭方法：在 `~/.web/config.toml` 的 `[runtime]` 段设 `logging = false`。
+Disable: in `~/.web/config.toml` under `[runtime]`, set `logging = false`.
 
 ---
 
-## Inject Prompt（注入提示文字）
+## Inject prompt
 
-可以为每个能力段配置 `inject_before` / `inject_after`，在输出结果的前面和后面注入一段文字。适合给 AI Agent 加上下文提示。
+Per capability section you can set `inject_before` / `inject_after` in TOML to wrap output (useful for agent prompts).
 
 ```toml
 [search]
@@ -533,78 +516,74 @@ inject_before = "The following results are from Internet searches, for reference
 inject_after = ""
 ```
 
-每个能力段（search / fetch / research / answer）可以分别设置。
+Set independently for `search`, `fetch`, `research`, `answer`.
 
 ---
 
-## 出问题了怎么排查
+## Troubleshooting
 
-### 第一步：看日志目录
+### Logs first
 
-命令不会在终端打印调试流水。开启 `runtime.logging`（默认）时，打开 **`<当前目录>/.web/logs/`** 下对应日期的 `.log` 文件，里面有请求、响应与报错栈。
+There is no verbose stderr stream. With `runtime.logging` (default), open `**<cwd>/.web/logs/*.log**` for requests, responses, and stacks.
 
-### 第二步：看日志文件
-
-日志默认写在 `<当前目录>/.web/logs/` 下，里面有完整的请求和响应记录。
-
-### 常见错误
+### Common errors
 
 
-| 报错                                            | 原因                                                            | 怎么办                                                                     |
-| --------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `环境变量未设置: TAVILY_API_KEY`                     | 你在 config 里开了 Tavily（`enabled = true`），但 `~/.web/.env` 里没填密钥。 | 去 `~/.web/.env` 填上密钥；如果暂时不想用这个服务，把 config 里对应的 `enabled` 改成 `false` 就行。 |
-| `All search providers failed: …`              | 你配的搜索服务全都没成功。                                                 | 查看 `<cwd>/.web/logs/`；核对密钥与网络；`web config list`。                           |
-| `Unsupported provider 'xxx'. Available for …` | `--provider` 或 `--providers` 里写了一个不存在的名字。                     | 按提示信息里列出的可用名字修改即可。                                                      |
-| `All fetch providers failed`                  | `[fetch.account.*]` 链上全部失败。                                   | 查看 `<cwd>/.web/logs/`；调整 `[fetch.account.*]` 顺序或增删账号；用 `--provider` / `--account` 收窄排查。 |
-
-
----
-
-## 内置支持的服务商
-
-配置里的 `provider = "xxx"` 填厂商名，CLI 根据能力段上下文自动选用对应组件。
-
-
-| 厂商名             | 服务商                 | 支持的能力         | 需要密钥吗                                                                 |
-| --------------- | ------------------- | ------------- | --------------------------------------------------------------------- |
-| `jina`          | Jina                | search、fetch  | 需要 `JINA_API_KEY`（[申请](https://jina.ai/)）                             |
-| `tavily`        | Tavily              | search        | 需要 `TAVILY_API_KEY`（[申请](https://app.tavily.com/)）                    |
-| `brave`         | Brave               | search、answer | 需要 `BRAVE_API_TOKEN`（[申请](https://brave.com/search/api/)）             |
-| `kimi`          | Kimi / Moonshot     | search、fetch  | 需要 `MOONSHOT_API_KEY`（[申请](https://platform.moonshot.cn/)）            |
-| `firecrawl`     | Firecrawl           | search、fetch  | 需要 `FIRECRAWL_API_KEY`（[申请](https://www.firecrawl.dev/)）              |
-| `perplexity`    | Perplexity          | search        | 需要 `PERPLEXITY_API_KEY`（[申请](https://www.perplexity.ai/settings/api)） |
-| `html2markdown` | 内置 HTML→Markdown 引擎 | fetch         | 不需要                                                                   |
-| `http`          | 直连 HTTP GET         | fetch         | 不需要                                                                   |
-| `playwright`    | 无头 Chromium 抓取      | fetch         | 不需要                                                                   |
-| `duckduckgo`    | DuckDuckGo 即时回答     | answer        | 不需要                                                                   |
-| `gemini`        | Gemini + Google 搜索  | answer        | 需要 `GEMINI_API_KEY`（[申请](https://aistudio.google.com/apikey)）         |
-
-
-各厂商密钥申请地址也可直接打开仓库里的 `init/config.toml` 或 `init/.env.example` 顶部说明。
-
-想看每个服务底层发的是什么 HTTP 请求（curl 示例），见 `[docs/provider-curl-mapping.md](docs/provider-curl-mapping.md)`——普通使用不需要看。
-
----
-
-## 更多文档
-
-普通用户看上面的内容就够了。下面这些是给想深入了解或参与开发的人准备的：
-
-
-| 文档                                                                   | 谁需要看       | 内容                         |
-| -------------------------------------------------------------------- | ---------- | -------------------------- |
-| `[docs/onboard.md](docs/onboard.md)`                                 | 想了解配置合并细节  | 首次配置的完整流程，全局配置和项目配置怎么合并。   |
-| `[docs/provider-curl-mapping.md](docs/provider-curl-mapping.md)`     | 想知道底层请求长啥样 | 每个服务商对应的原始 curl 命令，方便自己调试。 |
-| `[docs/plugin-protocol.md](docs/plugin-protocol.md)`                 | 想写自己的插件    | 插件目录结构和接入约定。               |
-| `[CLAUDE.md](CLAUDE.md)`                                             | 参与开发的人     | 代码规范和开发约束。                 |
-| `[SOUL.md](SOUL.md)`                                                 | 想了解设计思路    | 项目设计理念。                    |
-| `[.claude/skills/web-cli/SKILL.md](.claude/skills/web-cli/SKILL.md)` | AI Agent   | Agent 怎么调用这个 CLI。          |
+| Message                                                                | Cause                                                 | What to do                                                                              |
+| ---------------------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `环境变量未设置: TAVILY_API_KEY` (example)                                    | Account enabled but key missing in `~/.web/.env`.     | Add key or set `enabled = false` for that account.                                      |
+| `search: all configured accounts failed…`                              | Entire search chain failed or no search registration. | Check `<cwd>/.web/logs/`; verify `[search.account.*]` and keys.                         |
+| `research: no accounts configured…`                                    | No `[research.account.*]`.                            | Add tavily / perplexity research accounts.                                              |
+| `research: configured account(s) use provider(s) that do not support…` | Research section has non-research vendors.            | Use `provider = "tavily"` or `perplexity`.                                              |
+| `Unsupported provider 'xxx'. Available for …`                          | Bad `--provider` / `--providers` name.                | Fix using the listed names.                                                             |
+| `All fetch providers failed`                                           | Entire fetch chain failed.                            | Check logs; reorder or fix `[fetch.account.*]`; narrow with `--provider` / `--account`. |
 
 
 ---
 
-## 我为什么做这个项目
+## Built-in providers
 
-每个 AI Agent 框架都需要「搜索」和「抓取」能力，但每个框架各自接各自的，密钥配置散落各处，A 工具配一遍 B 工具又配一遍。
+`provider = "xxx"` is the vendor name; the CLI selects the component for the current capability.
 
-这个项目的想法很简单：**把所有搜索/抓取/问答服务统一收到一条 `web` 命令里**。配一次，到处用。挂一家，自动换。
+
+| Vendor          | Service                | Capabilities                                                                                                                                                                                                                                                                                  | Docs / keys                      |
+| --------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `jina`          | Jina                   | search, [Reader fetch](https://r.jina.ai/docs)                                                                                                                                                                                                                                                | [Search](https://s.jina.ai/docs) |
+| `tavily`        | Tavily                 | search (`[include_answer](https://docs.tavily.com/documentation/api-reference/endpoint/search)`), [extract](https://docs.tavily.com/documentation/api-reference/endpoint/extract) fetch, [research](https://docs.tavily.com/documentation/api-reference/endpoint/research), answer via search | `TAVILY_API_KEY`                 |
+| `brave`         | Brave                  | [Web search](https://api-dashboard.search.brave.com/app/documentation/web-search/get-started), [Answers](https://api-dashboard.search.brave.com/documentation/services/answers)                                                                                                               | `BRAVE_API_TOKEN`                |
+| `kimi`          | Kimi / Moonshot        | search ([web_search / tools](https://platform.kimi.com/docs/guide/use-web-search)), fetch (formula)                                                                                                                                                                                           | `MOONSHOT_API_KEY`               |
+| `firecrawl`     | Firecrawl              | [search](https://docs.firecrawl.dev/features/search), [scrape](https://docs.firecrawl.dev/features/scrape) fetch, [interact](https://docs.firecrawl.dev/features/interact) answer (needs `--url`)                                                                                             | `FIRECRAWL_API_KEY`              |
+| `perplexity`    | Perplexity             | [Search](https://docs.perplexity.ai/docs/search/quickstart), [Sonar answer](https://docs.perplexity.ai/docs/sonar/pro-search/quickstart), [Sonar research](https://docs.perplexity.ai/docs/sonar/quickstart)                                                                                  | `PERPLEXITY_API_KEY`             |
+| `html2markdown` | Built-in engine        | fetch                                                                                                                                                                                                                                                                                         | —                                |
+| `http`          | Direct HTTP GET        | fetch                                                                                                                                                                                                                                                                                         | —                                |
+| `playwright`    | Headless Chromium      | fetch                                                                                                                                                                                                                                                                                         | —                                |
+| `duckduckgo`    | DuckDuckGo             | answer                                                                                                                                                                                                                                                                                        | —                                |
+| `gemini`        | Gemini + Google Search | answer                                                                                                                                                                                                                                                                                        | `GEMINI_API_KEY`                 |
+
+
+Key signup URLs are also listed at the top of `init/config.toml` and `init/.env.example`.
+
+HTTP-level curl examples: `[docs/provider-curl-mapping.md](docs/provider-curl-mapping.md)` (optional deep dive).
+
+---
+
+## More documentation
+
+
+| Doc                                                                  | Audience             | Content                              |
+| -------------------------------------------------------------------- | -------------------- | ------------------------------------ |
+| `[docs/onboard.md](docs/onboard.md)`                                 | Config merge details | Onboarding, global vs project merge. |
+| `[docs/provider-curl-mapping.md](docs/provider-curl-mapping.md)`     | Debugging HTTP       | Curl-shaped examples per vendor.     |
+| `[docs/plugin-protocol.md](docs/plugin-protocol.md)`                 | Plugin authors       | Layout and protocol.                 |
+| `[CLAUDE.md](CLAUDE.md)`                                             | Contributors         | Repo rules and boundaries.           |
+| `[SOUL.md](SOUL.md)`                                                 | Design intent        | Product principles.                  |
+| `[.claude/skills/web-cli/SKILL.md](.claude/skills/web-cli/SKILL.md)` | AI agents            | How agents invoke this CLI.          |
+
+
+---
+
+## Why this project
+
+Every agent stack needs search and fetch, but keys and adapters end up duplicated across tools.
+
+This project puts **search, fetch, answer, and research behind one `web` command**: configure once, reuse everywhere, failover across accounts.

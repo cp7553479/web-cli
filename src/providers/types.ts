@@ -3,6 +3,7 @@ import type {
   FetchRequest,
   ProviderContext,
   ProviderResponse,
+  ResearchRequest,
   SearchRequest,
 } from "../core/types";
 
@@ -21,12 +22,19 @@ export interface AnswerProvider {
   answer(request: AnswerRequest, context: ProviderContext): Promise<ProviderResponse>;
 }
 
+export interface ResearchProvider {
+  id: string;
+  research(request: ResearchRequest, context: ProviderContext): Promise<ProviderResponse>;
+}
+
 export interface ProviderRegistry {
   getSearch(id: string): SearchProvider | undefined;
   getFetch(id: string): FetchProvider | undefined;
   getAnswer(id: string): AnswerProvider | undefined;
+  getResearch(id: string): ResearchProvider | undefined;
   listSearch(): string[];
   listFetch(): string[];
   listAnswer(): string[];
+  listResearch(): string[];
 }
 

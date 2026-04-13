@@ -1,8 +1,8 @@
 import { createRequire } from "node:module";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
-import { getConfigPaths } from "../config";
 import { errorLog } from "../core/logger";
 import type { WebPlugin } from "./protocol";
 import type { PluginHost } from "./host";
@@ -16,7 +16,7 @@ export interface WebPluginManifest {
 }
 
 export function getUserPluginsRoot(): string {
-  return path.join(getConfigPaths().rootDir, "plugins");
+  return path.join(os.homedir(), ".web", "plugins");
 }
 
 export function getProjectPluginsRoot(cwd = process.cwd()): string {
