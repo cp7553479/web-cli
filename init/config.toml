@@ -1,0 +1,166 @@
+# =============================================================================
+# Web CLI 全局配置模板（TOML）
+# =============================================================================
+#
+# 【各厂商 API Key 申请地址】（复制到浏览器打开）
+#   Tavily       https://app.tavily.com/
+#   Brave        https://brave.com/search/api/
+#   Jina AI      https://jina.ai/  （官网「Reader / Search API」与控制台创建密钥）
+#   Moonshot Kimi https://platform.moonshot.cn/
+#   Firecrawl    https://www.firecrawl.dev/
+#   Perplexity   https://www.perplexity.ai/settings/api
+#   Gemini       https://aistudio.google.com/apikey
+#   DuckDuckGo  Instant Answer 无单独 API Key（本模板 answer 段 ddg 可不配密钥）
+#
+# 【account 与账号 id】
+#   表头形如 [search.account.perplexity-main]：最后一段为内部「账号 id」，可自定义；
+#   同一 provider 可多行不同账号 id，按文件顺序依次尝试。
+#
+# 【与 .env】
+#   api_token = "{$XXX}" 对应 ~/.web/.env；仅 enabled = true 的条目会解析并要求变量非空。
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# [search] — 网页搜索（各 [search.account.*] 按出现顺序尝试）
+# -----------------------------------------------------------------------------
+# 默认仅启用 Jina Search；其余厂商为「注释模板」，去掉行首 # 并设 enabled = true 后使用。
+
+[search]
+
+# Jina Search：需 JINA_API_KEY，计费与额度以 Jina 官方为准。
+[search.account.jina-main]
+provider = "jina"
+api_token = "{$JINA_API_KEY}"
+enabled = true
+
+# --- 以下为 search 模板（默认注释，按需取消注释并配置） ---
+# [search.account.tavily-main]
+# provider = "tavily"
+# api_token = "{$TAVILY_API_KEY}"
+# enabled = false
+
+# [search.account.brave-main]
+# provider = "brave"
+# api_token = "{$BRAVE_API_TOKEN}"
+# enabled = false
+
+# [search.account.kimi-main]
+# provider = "kimi"
+# api_token = "{$MOONSHOT_API_KEY}"
+# enabled = false
+
+# [search.account.firecrawl-main]
+# provider = "firecrawl"
+# api_token = "{$FIRECRAWL_API_KEY}"
+# enabled = false
+
+# [search.account.perplexity-main]
+# provider = "perplexity"
+# api_token = "{$PERPLEXITY_API_KEY}"
+# enabled = false
+
+# -----------------------------------------------------------------------------
+# [fetch] — 按 URL 抓取（各 [fetch.account.*] 按出现顺序尝试）
+# -----------------------------------------------------------------------------
+# 顺序：Jina Reader（r.jina.ai）→ Playwright → … → html2markdown → http。
+# http 默认关闭；html2markdown 默认开启，放在链末作兜底转换。
+
+[fetch]
+
+# Jina Reader：通过 r.jina.ai 拉取网页正文，需 JINA_API_KEY（与 search 段 Jina 共用变量名）。
+[fetch.account.jina-reader]
+provider = "jina"
+api_token = "{$JINA_API_KEY}"
+enabled = true
+
+# playwright：无头浏览器（需已安装 Playwright；无 api_token）。
+[fetch.account.playwright-main]
+provider = "playwright"
+enabled = true
+
+# --- 以下为 fetch 模板（默认注释） ---
+# [fetch.account.firecrawl-scrape]
+# provider = "firecrawl"
+# api_token = "{$FIRECRAWL_API_KEY}"
+# enabled = false
+
+# [fetch.account.kimi-fetch]
+# provider = "kimi"
+# api_token = "{$MOONSHOT_API_KEY}"
+# enabled = false
+
+# html2markdown：内置 HTML→Markdown 引擎（无需密钥），默认开启，放在链末。
+[fetch.account.html2markdown-main]
+provider = "html2markdown"
+enabled = true
+
+# http：直连 GET，默认关闭；需要时改为 enabled = true。
+[fetch.account.http-main]
+provider = "http"
+enabled = false
+
+# -----------------------------------------------------------------------------
+# [research] — 深度研究用搜索源（结构与 search 相同）
+# -----------------------------------------------------------------------------
+
+[research]
+
+[research.account.jina-main]
+provider = "jina"
+api_token = "{$JINA_API_KEY}"
+enabled = true
+
+# --- 以下为 research 模板（默认注释，与 search 段类似） ---
+# [research.account.tavily-main]
+# provider = "tavily"
+# api_token = "{$TAVILY_API_KEY}"
+# enabled = false
+
+# [research.account.perplexity-main]
+# provider = "perplexity"
+# api_token = "{$PERPLEXITY_API_KEY}"
+# enabled = false
+
+# [research.account.brave-main]
+# provider = "brave"
+# api_token = "{$BRAVE_API_TOKEN}"
+# enabled = false
+
+# [research.account.kimi-main]
+# provider = "kimi"
+# api_token = "{$MOONSHOT_API_KEY}"
+# enabled = false
+
+# [research.account.firecrawl-main]
+# provider = "firecrawl"
+# api_token = "{$FIRECRAWL_API_KEY}"
+# enabled = false
+
+# -----------------------------------------------------------------------------
+# [answer] — 快答
+# -----------------------------------------------------------------------------
+
+[answer]
+
+[answer.account.ddg-main]
+provider = "duckduckgo"
+enabled = true
+
+# --- 以下为 answer 模板（默认注释） ---
+# [answer.account.brave-answer]
+# provider = "brave"
+# api_token = "{$BRAVE_API_TOKEN}"
+# enabled = false
+
+# [answer.account.gemini-main]
+# provider = "gemini"
+# api_token = "{$GEMINI_API_KEY}"
+# enabled = false
+
+# -----------------------------------------------------------------------------
+# [runtime]
+# -----------------------------------------------------------------------------
+
+[runtime]
+logging = true
