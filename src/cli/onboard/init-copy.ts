@@ -83,6 +83,10 @@ export function copyInitToWebHome(opts: { force: boolean }): void {
   process.stdout.write(`Initialized: ${paths.rootDir}\n`);
   process.stdout.write(`Config: ${paths.configPath}\n`);
   process.stdout.write(`Env: ${paths.envPath}\n`);
+  process.stdout.write(`\n下一步:\n`);
+  process.stdout.write(`  1. 编辑 ${paths.envPath}，填入你的 API key\n`);
+  process.stdout.write(`  2. 运行 web config list 确认配置\n`);
+  process.stdout.write(`  3. 运行 web search "hello world" 测试搜索\n`);
 }
 
 export function writeWebHomeReadmeIfMissing(rootDir: string): void {

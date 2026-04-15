@@ -8,7 +8,7 @@ export const modelConfigSchema = z.object({
 });
 
 export const groupConfigSchema = z.object({
-  account: z.record(z.string().min(1), modelConfigSchema),
+  account: z.record(z.string().min(1), modelConfigSchema).default({}),
   inject_before: z.string().optional(),
   inject_after: z.string().optional(),
 });

@@ -87,30 +87,45 @@ Extra body fields go through `--vendor key=value` (repeatable). On `search` / `a
 
 ## Install
 
-### From npm (published)
+### Option 1: npx (no global install needed)
 
-The CLI is published on the public npm registry as `**@cp7553479/web-cli`**:
+The easiest way — no install step at all:
 
-- **Package:** [https://www.npmjs.com/package/@cp7553479/web-cli](https://www.npmjs.com/package/@cp7553479/web-cli)
+```bash
+npx @cp7553479/web-cli --help
+```
+
+> **Tip:** Create a shell alias so you can just type `web`:
+>
+> ```bash
+> # Bash / Zsh — add to ~/.bashrc or ~/.zshrc
+> alias web='npx @cp7553479/web-cli'
+> ```
+
+### Option 2: npm global install
 
 ```bash
 npm install -g @cp7553479/web-cli
 ```
 
-This installs the `web` binary globally.
+If `web` is not found after install, npm's global bin directory is likely not in your `PATH`:
 
-### From source (this repository)
+```bash
+# Check where npm installs global bins
+npm config get prefix
+# Add to PATH (example — adjust the path to match your system)
+export PATH="$(npm config get prefix)/bin:$PATH"
+```
+
+Alternatively, use `npx` (Option 1) which always works without modifying `PATH`.
+
+### Option 3: from source
 
 ```bash
 git clone <this-repo-url>
 cd web
 npm install
 npm run build
-```
-
-Register the `web` command globally:
-
-```bash
 npm link
 ```
 

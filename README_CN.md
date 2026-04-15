@@ -87,20 +87,47 @@
 
 ## 安装
 
+### 方式一：npx（免全局安装）
+
+最简单的方式——不需要任何安装步骤：
+
+```bash
+npx @cp7553479/web-cli --help
+```
+
+> **小技巧：** 建一个 shell alias，之后就能直接敲 `web`：
+>
+> ```bash
+> # Bash / Zsh — 加到 ~/.bashrc 或 ~/.zshrc
+> alias web='npx @cp7553479/web-cli'
+> ```
+
+### 方式二：npm 全局安装
+
+```bash
+npm install -g @cp7553479/web-cli
+```
+
+如果安装后 `web` 命令找不到，说明 npm 的全局 bin 目录不在 `PATH` 里：
+
+```bash
+# 查看 npm 全局 bin 在哪
+npm config get prefix
+# 加到 PATH（路径以实际输出为准）
+export PATH="$(npm config get prefix)/bin:$PATH"
+```
+
+也可以直接用 npx（方式一），不依赖 PATH 配置。
+
+### 方式三：从源码安装
+
 ```bash
 git clone <本仓库地址>
 cd web
 npm install
 npm run build
-```
-
-装完后让系统认识 `web` 命令：
-
-```bash
 npm link
 ```
-
-这会把 `web` 注册为全局命令，之后在任何目录都能直接敲 `web …`。
 
 试一下装好了没有：
 

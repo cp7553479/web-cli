@@ -1,5 +1,7 @@
 import { Command } from "commander";
 
+import { version as pkgVersion } from "../../package.json";
+
 import { registerAnswerCommand } from "./commands/answer";
 import { registerConfigCommand } from "./commands/config";
 import { registerFetchCommand } from "./commands/fetch";
@@ -23,6 +25,7 @@ export async function runCli(argv: string[]): Promise<void> {
   const program = new Command();
   program
     .name("web")
+    .version(pkgVersion)
     .description("Web CLI for multi-provider web search tools")
     .option("-f, --format <value>", "输出格式: json|markdown|text", "text")
     .option("--stdout", "输出到 stdout", true)

@@ -32,4 +32,20 @@ describe("webConfigSchema enabled", () => {
     if (!r.success) return;
     expect(r.data.fetch.account["http-main"]?.enabled).toBe(false);
   });
+
+  it("account 缺失时默认为空对象（不报错）", () => {
+    // 模拟 TOML 中 [research] 段下没有任何子表 —— account 键完全不存在
+    const raw = {
+      search: { account: { "jina-main": { provider: "jina", enabled: true } } },
+      fetch: { account: {} },
+      research: {}, // account 缺失
+      answer: {},   // account 缺失
+    };
+    const r = webConfigSchema.safeParse(raw);
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.research.account).toEqual({});
+    expect(r.data.answer.account).toEqual({});
+    expect(Object.keys(r.data.research.account)).toHaveLength(0);
+  });
 });
