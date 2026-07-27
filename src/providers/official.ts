@@ -75,7 +75,7 @@ export class FirecrawlSearchProvider implements SearchProvider {
           limit: request.limit,
         },
       });
-      const data = (raw as any).data ?? (raw as any).results ?? [];
+      const data = (raw as any).data?.web ?? [];
       const items = data.map((item: any) => ({
         title: item.title,
         url: item.url,
@@ -329,4 +329,3 @@ function normalizeJinaSearch(raw: unknown): ProviderResponse["items"] {
   }
   return [{ content: JSON.stringify(raw), source: "jina_search" }];
 }
-
