@@ -40,6 +40,11 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      # Trusted publishing (OIDC) requires npm CLI >= 11.5.1, but Node 20
+      # bundles npm 10.x, which silently publishes unauthenticated (E404).
+      - name: Update npm
+        run: npm install -g npm@11
+
       - name: Install
         run: npm ci
 
