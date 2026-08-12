@@ -1,96 +1,102 @@
-# Provider 插件协议
+# Plugin protocol
 
-## 分层
+How external providers plug into `web`. The mechanism lives in core
+(`PluginHost`); discovery + loading is web-domain (`src/web/plugins/external.ts`).
 
-1. **协议层**（`src/plugins/protocol.ts`）
-   定义 `PluginRegistrationApi`：以厂商名注册 `ProviderFactory`，每个 factory 可声明 `createSearch` / `createFetch` / `createAnswer` / `createResearch` 子组件（按需实现）。
+## Layering
 
-2. **宿主**（`src/plugins/host.ts`）
-   `PluginHost` 维护一个 `Map<厂商名, ProviderFactory>`。`materialize(config)` 时，遍历 `search` / `fetch` / `answer` / `research` 各能力段的 `account`，根据 `provider`（厂商名）查找 factory，按当前能力段调用对应的 `createSearch` / `createFetch` / `createAnswer` / `createResearch`，生成 `InMemoryProviderRegistry`。
+1. **PluginHost** (`src/core/protocol/plugin-host.ts`) — a `Map<providerName,
+   ProviderFactory>`. Built-in factories register first; external plugins
+   register later and may override a same-named factory.
+2. **ProviderFactory** (`src/core/protocol/provider.ts`) — declares
+   `capabilities: string[]` and `create(capability, binding) → ProviderInstance`.
+3. **External loader** (`src/web/plugins/external.ts`) — scans
+   `~/.web/plugins/<id>/plugin.json`, `require`s the entry, and calls
+   `activate(host)`.
 
-3. **内置插件**（`src/plugins/builtin.ts`）
-   当前所有官方对接的 provider 以厂商为单位注册，**不**放在 `~/.web/plugins`。
+## Discovery order
 
-4. **外部插件加载器**（`src/plugins/loader.ts`）
-   扫描 `~/.web/plugins/<name>/web-plugin.json`（以及当前 cwd 下 `./.web/plugins`，见下文），`require` 入口模块并调用 `activate(api)`。
+1. `~/.web/plugins/<id>/plugin.json`
+2. `./.web/plugins/<id>/plugin.json` (project; overrides user on name collision)
+3. built-in factories (registered first, so plugins override them)
 
-## 配置如何映射到实例
-
-`~/.web/config.toml`（及可选合并的 `./.web/config.toml`）中每条 **`[*.account.alias]`** 账号块：
-
-```toml
-[search.account.my-alias]
-provider = "tavily"
-api_token = "{$TAVILY_API_KEY}"
-```
-
-`provider` 字段写**厂商名**，必须与某插件注册的 factory 名一致。`PluginHost` 根据当前能力段（search / fetch / answer / research）为每个启用的 **`(alias, account)`**（`enabled` 省略或为 `true` 时视为启用，仅 `enabled = false` 时跳过）调用 factory 对应的 `createSearch` / `createFetch` / `createAnswer` / `createResearch`，得到 provider 实例；实例的 `id` 为 **alias**（与 orchestrator 查找一致）。
-
-如果某厂商未提供当前能力段所需的子组件（如在 `[fetch]` 段配了 `provider = "duckduckgo"` 但 factory 没有 `createFetch`），该账号会被跳过。
-
-## 外部插件目录布局
+## Layout
 
 ```
-~/.web/plugins/          # 用户级外部插件
+~/.web/plugins/
   my-vendor/
-    web-plugin.json
-    index.cjs
-
-./.web/plugins/          # 项目级（与 ~/.web/plugins 同名工厂时后者覆盖注册）
+    plugin.json     { "id": "my-vendor", "main": "index.cjs", "version": "1.0.0" }
+    index.cjs       exports a WebPlugin (default or `webPlugin`)
 ```
 
-### web-plugin.json
+- `main` MUST be a CommonJS module (`.cjs` or require-able `.js`).
+- The export is `{ id, version?, activate(api) }`; `activate` receives the
+  `PluginHost` and calls `api.registerProvider(name, factory)`.
 
-```json
-{
-  "id": "my-vendor",
-  "main": "index.cjs",
-  "version": "1.0.0"
-}
-```
-
-- `main`：相对插件目录的入口文件，**当前仅支持 CommonJS**（`.cjs` 或可被 `require` 的 `.js`）。
-- 入口须导出 `WebPlugin`：`default` 或 `webPlugin` 字段。
-
-### index.cjs 示例
+## Example
 
 ```javascript
+// ~/.web/plugins/acme/index.cjs
 function activate(api) {
   api.registerProvider("acme", {
-    createSearch(binding) {
+    capabilities: ["search"],
+    create(capability, binding) {
+      // binding = { alias, providerName, apiToken, baseUrl }
       return {
         id: binding.alias,
-        async search(request, context) {
-          return { provider: binding.alias, items: [], raw: null };
-        },
-      };
-    },
-    createFetch(binding) {
-      return {
-        id: binding.alias,
-        async fetch(request, context) {
-          return { provider: binding.alias, items: [], raw: null };
+        providerName: binding.providerName,
+        account: { alias: binding.alias, apiToken: binding.apiToken, baseUrl: binding.baseUrl },
+        hooks: {
+          buildRequest(req, ctx) {
+            return {
+              method: "POST",
+              url: "https://api.acme.test/search",
+              headers: { Authorization: `Bearer ${ctx.account.apiToken}`, "Content-Type": "application/json" },
+              json: { q: req.query, n: req.limit },
+            };
+          },
+          parseResponse(result, req) {
+            const parsed = JSON.parse(result.bodyText);
+            return {
+              provider: binding.alias,
+              items: (parsed.hits || []).map((h) => ({ title: h.title, url: h.url, snippet: h.snippet, source: "acme" })),
+              raw: parsed,
+            };
+          },
         },
       };
     },
   });
 }
 
-module.exports = {
-  default: { id: "my-vendor", version: "1.0.0", activate },
-};
+module.exports = { default: { id: "acme", version: "1.0.0", activate } };
 ```
 
-将 `provider = "acme"` 写入 config 对应能力段即可使用（需自行实现 HTTP 调用与错误处理）。
+Then add to `~/.web/config.json`:
 
-## 覆盖内置 provider
+```json
+{ "search": { "account": { "acme-main": { "provider": "acme", "api_token": "{$ACME_KEY}" } } } }
+```
 
-后加载的外部插件若对同一厂商名再次 `registerProvider`，会覆盖先前 factory（内置先注册，外部后加载时可覆盖）。覆盖行为无单独 CLI 开关；可在 `<cwd>/.web/logs/` 中查看已记录的外部插件加载与请求日志（`runtime.logging` 未关闭时）。
+## Hooks (lifecycle)
+
+A provider declares EITHER:
+- `buildRequest(req, ctx)` + `parseResponse(result, req, ctx)` (HTTP providers —
+  the pool runs the transport between them), OR
+- `execute(req, ctx)` (self-contained providers that bypass the HTTP transport,
+  e.g. a browser-driven fetch).
+
+Optionally `classifyFailure(error, ctx) → FailureClass`. See
+[`error-handling.md`](./error-handling.md).
 
 ## CLI
 
-- `web plugins list`：列出已发现的外部插件 manifest。
+- `web provider list` includes plugin-registered provider ids.
+- `web plugins` is intentionally not a command in v1 (discovery is via
+  `web provider list`).
 
-## 安全说明
+## Security
 
-外部插件为**用户本机任意代码**，执行等同于在 Node 中 `require` 用户脚本。仅从可信来源安装插件。
+External plugins are **in-process `require`** = arbitrary code with full
+privileges. Install only trusted plugins. (A sandboxed subprocess runtime is
+reserved for a future revision; the factory interface already accommodates it.)

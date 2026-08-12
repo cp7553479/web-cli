@@ -1,0 +1,15 @@
+{
+  "runtime": {
+    "logging": true
+  },
+  "search": {
+    "inject_before": "",
+    "inject_after": "",
+    "account": {}
+  },
+  "fetch": {
+    "inject_before": "",
+    "inject_after": "",
+    "account": {}
+  }
+}

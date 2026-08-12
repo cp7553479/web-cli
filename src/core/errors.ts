@@ -1,3 +1,9 @@
+/**
+ * Base error type for all expected, user-facing failures.
+ *
+ * Carries a stable `code` (for programmatic consumers and tests) and optional
+ * `details` (raw context that must never contain secrets in default output).
+ */
 export class AppError extends Error {
   constructor(
     message: string,
@@ -9,8 +15,14 @@ export class AppError extends Error {
   }
 }
 
-export function toError(error: unknown): Error {
-  if (error instanceof Error) return error;
-  return new Error(String(error));
+/** Narrows an unknown caught value into a real Error. */
+export function toError(value: unknown): Error {
+  if (value instanceof Error) return value;
+  return new Error(String(value));
 }
 
+/** Human-readable message for an unknown caught value. */
+export function errorMessage(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  return String(value);
+}

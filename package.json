@@ -1,7 +1,7 @@
 {
   "name": "@cp7553479/web-cli",
-  "version": "1.0.4",
-  "description": "",
+  "version": "2.0.0",
+  "description": "Unified web search + fetch CLI with a portable provider-pool core (curl-based).",
   "main": "dist/index.js",
   "bin": {
     "web": "dist/index.js"
@@ -17,32 +17,47 @@
   "files": [
     "dist/",
     "init/",
-    "README.md"
+    "README.md",
+    "SPEC.md",
+    "AGENTS.md"
   ],
   "keywords": [
     "web",
     "search",
     "fetch",
-    "research",
-    "cli"
+    "cli",
+    "provider",
+    "curl"
   ],
   "author": "cp7553479",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cp7553479/web-cli.git"
+  },
+  "homepage": "https://github.com/cp7553479/web-cli#readme",
+  "bugs": {
+    "url": "https://github.com/cp7553479/web-cli/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "dependencies": {
-    "@iarna/toml": "^2.2.5",
-    "@inquirer/prompts": "^7.10.1",
     "commander": "^14.0.3",
-    "dotenv": "^17.4.1",
-    "linkedom": "^0.18.12",
-    "playwright": "^1.59.1",
-    "undici": "^8.0.2",
-    "zod": "^4.3.6"
+    "linkedom": "^0.18.12"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.59.1"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

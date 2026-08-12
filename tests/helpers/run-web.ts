@@ -1,42 +1,35 @@
-import { execFileSync } from "node:child_process";
-import fs from "node:fs";
+import { spawn } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-/** 仓库根（tests/helpers → 上两级），不依赖 Vitest 进程 cwd。 */
-export const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-
-export function distEntry(): string {
-  return path.join(repoRoot, "dist", "index.js");
+export interface RunResult {
+  stdout: string;
+  stderr: string;
+  code: number | null;
 }
 
-export function assertDistBuilt(): void {
-  if (!fs.existsSync(distEntry())) {
-    throw new Error("dist/index.js missing: run npm run build before integration tests");
-  }
-}
+const ENTRY = path.resolve(__dirname, "..", "..", "dist", "index.js");
 
-export function runWeb(
-  args: string[],
-  options: { env?: NodeJS.ProcessEnv; cwd?: string } = {},
-): { status: number; stdout: string; stderr: string } {
-  assertDistBuilt();
-  const node = process.execPath;
-  const env = { ...process.env, ...options.env };
-  try {
-    const stdout = execFileSync(node, [distEntry(), ...args], {
-      encoding: "utf8",
-      cwd: options.cwd ?? repoRoot,
-      env,
+/**
+ * Runs the built CLI (`dist/index.js`) as a subprocess with an isolated HOME,
+ * so config tests never touch the developer's real ~/.web. Returns captured
+ * stdout/stderr/exit-code. Caller passes extra env (e.g. API keys) as needed.
+ */
+export function runWeb(args: string[], env: Record<string, string> = {}): Promise<RunResult> {
+  return new Promise((resolve) => {
+    const child = spawn("node", [ENTRY, ...args], {
+      env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
-    return { status: 0, stdout: String(stdout), stderr: "" };
-  } catch (e: unknown) {
-    const err = e as { status?: number; stdout?: string | Buffer; stderr?: string | Buffer };
-    return {
-      status: typeof err.status === "number" ? err.status : 1,
-      stdout: err.stdout !== undefined ? String(err.stdout) : "",
-      stderr: err.stderr !== undefined ? String(err.stderr) : "",
-    };
-  }
+    const chunks: Buffer[] = [];
+    const errChunks: Buffer[] = [];
+    child.stdout.on("data", (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    child.stderr.on("data", (c) => errChunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    child.on("close", (code) => {
+      resolve({
+        stdout: Buffer.concat(chunks).toString("utf8"),
+        stderr: Buffer.concat(errChunks).toString("utf8"),
+        code,
+      });
+    });
+  });
 }

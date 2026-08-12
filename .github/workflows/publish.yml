@@ -1,0 +1,53 @@
+name: Publish to npm
+
+# Publishes @cp7553479/web-cli to npmjs.com using a Trusted Publisher (OIDC).
+# No NPM_TOKEN secret is stored: npm trusts this workflow via OpenID Connect.
+#
+# Trigger: push a version tag like `v2.0.0`. npm rejects re-publishing an
+# already-published version, so tag-triggered publishing (rather than every
+# push to main) is the reliable pattern.
+#
+# npm Trusted Publisher form values MUST match this file EXACTLY (case-sensitive):
+#   Organization or user : cp7553479
+#   Repository           : web-cli
+#   Workflow filename    : publish.yml      (filename only, no path)
+#   Environment name     : (leave blank)
+#
+# Prerequisite: package.json `repository.url` == the GitHub repo (it does).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for npm trusted publishing (OIDC)
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Publish
+        run: npm publish --provenance --access public

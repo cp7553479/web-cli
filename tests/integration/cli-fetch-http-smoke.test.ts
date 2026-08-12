@@ -1,16 +1,43 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { runWeb } from "../helpers/run-web";
 
-const fetchHttpSmokeEnabled = () => process.env.WEB_RUN_FETCH_HTTP_SMOKE === "1";
+const tmpHomes: string[] = [];
+function freshHome(): string {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "web-it-"));
+  tmpHomes.push(home);
+  return home;
+}
+afterEach(() => {
+  while (tmpHomes.length) fs.rmSync(tmpHomes.pop()!, { recursive: true, force: true });
+});
 
-describe("cli fetch smoke (http)", () => {
-  it.skipIf(!fetchHttpSmokeEnabled())(
-    "显式开启且 ./.web 已启用 http 账号时 exit 0（http:// 避免部分环境 TLS 链问题）",
-    () => {
-      const r = runWeb(["fetch", "http://example.com", "--provider", "http"]);
-      expect(r.status).toBe(0);
-      expect(r.stdout.toLowerCase()).toMatch(/example|doctype|html/i);
-    },
-  );
+const SMOKE = process.env.WEB_RUN_FETCH_HTTP_SMOKE === "1";
+
+describe("http provider fetch (live)", { skip: !SMOKE }, () => {
+  it("fetches example.com via curl http provider", async () => {
+    const home = freshHome();
+    await runWeb(["config", "init"], { HOME: home });
+    await runWeb(["config", "set", "fetch", "h", "--provider", "http"], { HOME: home });
+    const res = await runWeb(["fetch", "https://example.com", "--provider", "h", "--max-length", "300"], { HOME: home });
+    expect(res.code).toBe(0);
+    expect(res.stdout).toContain("Example Domain");
+  });
+});
+
+// Always-on assertion: without the smoke flag, this test just confirms the
+// command wires up (config + account) without making a network call.
+describe("http provider wiring (offline)", () => {
+  it("configures an http account and lists it", async () => {
+    const home = freshHome();
+    await runWeb(["config", "init"], { HOME: home });
+    const set = await runWeb(["config", "set", "fetch", "raw", "--provider", "http"], { HOME: home });
+    expect(set.code).toBe(0);
+    const list = await runWeb(["config", "list"], { HOME: home });
+    expect(list.stdout).toContain("provider=http");
+  });
 });
