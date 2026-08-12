@@ -41,6 +41,7 @@ export { CurlTransport, type CurlTransportOptions } from "./transport/curl";
 
 export {
   loadAppConfig,
+  loadAppEnv,
   loadCurrentPointer,
   deepMerge,
   resolveEnvTokens,

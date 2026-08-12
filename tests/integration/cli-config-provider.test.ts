@@ -82,6 +82,22 @@ describe("config lifecycle (isolated HOME)", () => {
     expect(doc.stdout).toMatch(/curl: ok/);
     expect(doc.stdout).toContain("factory=ok");
   });
+
+  it("doctor resolves {$ENV} tokens via ~/.web/.env, not only process.env", async () => {
+    const home = freshHome();
+    await runWeb(["config", "init"], { HOME: home });
+    // WEB_IT_TOKEN_X9 is deliberately absent from process.env; it exists only
+    // in ~/.web/.env, so this fails if doctor checks bare process.env.
+    await runWeb(
+      ["config", "set", "search", "main", "--provider", "tavily", "--token", "{$WEB_IT_TOKEN_X9}"],
+      { HOME: home },
+    );
+    fs.writeFileSync(path.join(home, ".web", ".env"), "WEB_IT_TOKEN_X9=it-secret\n", "utf8");
+    const doc = await runWeb(["config", "doctor"], { HOME: home });
+    expect(doc.code).toBe(0);
+    expect(doc.stdout).toContain("env=ok");
+    expect(doc.stdout).not.toContain("UNRESOLVED");
+  });
 });
 
 describe("provider list", () => {

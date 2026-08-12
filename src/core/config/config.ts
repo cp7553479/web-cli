@@ -72,6 +72,18 @@ export function loadCurrentPointer(paths: AppPaths): Record<string, string> {
   return readCurrentPointer(paths);
 }
 
+/**
+ * Returns the layered environment used for `{$VAR}` resolution
+ * (`process.env` ← global `.env` ← project `.env`). Diagnostic surfaces
+ * (e.g. `config doctor`) must check this, not bare `process.env`.
+ */
+export function loadAppEnv(
+  paths: AppPaths,
+  env: Record<string, string | undefined> = process.env,
+): Record<string, string | undefined> {
+  return mergeEnvLayers(env, paths);
+}
+
 function ensureGlobalRoot(paths: AppPaths): void {
   fs.mkdirSync(paths.globalRoot, { recursive: true });
 }

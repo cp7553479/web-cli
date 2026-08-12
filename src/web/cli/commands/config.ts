@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 
 import { Command } from "commander";
 
-import { AppError, getAppPaths } from "../../../core";
+import { AppError, getAppPaths, loadAppEnv } from "../../../core";
 import {
   APP_NAME,
   DEFAULT_CONFIG_JSON,
@@ -208,7 +208,10 @@ async function runDoctor(): Promise<DoctorReport> {
   report.curlAvailable = await hasCurl();
 
   // Factory + env-token presence check (global raw view, no resolution).
-  const { config } = loadGlobalWebConfigRaw();
+  // env check uses the same layered sources as runtime resolution
+  // (process.env ← ~/.web/.env ← project .env), not bare process.env.
+  const { config, paths } = loadGlobalWebConfigRaw();
+  const layeredEnv = loadAppEnv(paths);
   const host = new PluginHost();
   registerBuiltinFactories(host);
   const { skipped } = materializeRegistries(config, host);
@@ -217,7 +220,7 @@ async function runDoctor(): Promise<DoctorReport> {
     for (const [alias, account] of Object.entries(config[segment]?.account ?? {})) {
       const factoryOk = !skippedKey.has(`${segment}:${alias}`);
       const envMatch = account.api_token?.match(/^\{\$([A-Z0-9_]+)\}$/);
-      const envOk = !envMatch || Boolean(process.env[envMatch[1]]);
+      const envOk = !envMatch || Boolean(layeredEnv[envMatch[1]]);
       report.accounts.push({
         segment,
         alias,
