@@ -1,20 +1,40 @@
 [中文文档](README_CN.md)
 
-# Init templates
+# Init templates & skills
 
-`web onboard init` copies `config.toml` and `.env.example` from this directory into `~/.web/` (the env template becomes `~/.web/.env`; use `--force` to overwrite existing files). At runtime, `./.web/config.toml` and `./.web/.env` under a project **deep-merge** over the global home config.
+This directory ships with the npm package and holds the user-facing templates:
 
-## Multi-account and same-vendor failover
+- `config.json` — template mirror of the built-in default written by
+  `web config init` (the runtime source of truth is
+  `src/web/config/defaults.ts`; keep the two in sync).
+- `.env.example` — template for `~/.web/.env` API keys.
+- `skills/web-cli/` — **publish source** of the Agent skill (SKILL.md +
+  examples.md + troubleshooting.md). The `.claude/skills/web-cli/` copy in the
+  repo and `~/.web/skills/web-cli/` on a user machine must mirror it.
 
-Under each capability (`[search]`, `[fetch]`, `[answer]`, `[research]`) you can define multiple `[*.account.accountId]` blocks. **Declaration order is try order**: failures fall through silently until one succeeds or all fail.
+## Config model
 
-Multiple blocks with the same `provider` but different account ids (e.g. two Tavily keys) implement a key pool / rotation.
+- `~/.web/config.json` is the global config; `./.web/config.json` in a project
+  directory is **deep-merged over** it.
+- API tokens are plaintext or `{$ENV_VAR}` references, resolved from the
+  process environment ← `~/.web/.env` ← `./.web/.env` (later wins).
+- The active-account pointer lives in the separate `current.json`, managed by
+  `web config use <group> <alias>` — never edit `config.json` for it.
+
+## Multi-account failover
+
+Each capability group (`search`, `fetch`) holds an `account` map. The active
+account is tried first, then the rest in declaration order; every failure is
+classified and logged before rotating to the next. Multiple accounts with the
+same `provider` but different keys form a key pool.
 
 ## CLI vs config
 
-- `web search|fetch|answer|research … --provider <accountId or vendor>`: narrow to one account, or to all accounts for that vendor in file order.
-- `web … --account <accountId>`: pin exactly one account; optional `--provider` checks the vendor.
-- `web search|answer|research … --providers a b` is **multi concurrent**; **cannot** be combined with `--account`.
-- `web answer` takes the question as a **positional** argument (`web answer "question"`), not `--query`.
+- `web search|fetch … --account <alias>`: pin exactly one account.
+- `web search|fetch … --provider <nameOrAlias>`: pin one provider type or
+  account alias.
+- `web search|fetch … --vendor k=v`: provider-native params
+  (allowlist-filtered per provider).
 
-Full manual: repository root [README.md](../README.md) / [README_CN.md](../README_CN.md).
+Full manual: repository root [README.md](../README.md) /
+[README_CN.md](../README_CN.md); authoritative spec: `SPEC.md`.

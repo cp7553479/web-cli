@@ -1,6 +1,6 @@
 {
   "name": "@cp7553479/web-cli",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Unified web search + fetch CLI with a portable provider-pool core (curl-based).",
   "main": "dist/index.js",
   "bin": {

@@ -22,124 +22,83 @@ web search "Moonshot Kimi API 文档" \
   --limit 5
 ```
 
-## 3) 抓取网页正文（provider 模式）
+## 3) 抓取网页正文
 
 用户意图：拿到网页主体内容
 
 ```bash
-web fetch https://example.com \
-  --provider jina-reader \
-  -f markdown \
-  --max-length 12000
+web fetch https://example.com -f markdown --max-length 12000
 ```
 
-## 4) 抓取网页正文（HTTP 直连 account）
+## 4) 一次抓多个 URL
 
-用户意图：使用配置里 `provider = "http"` 的 fetch 账号
+用户意图：批量抓取，结果按 URL 顺序合并输出
 
 ```bash
-web fetch https://example.com --provider http -f text
+web fetch https://a.com https://b.com -f markdown
 ```
 
-## 5) 抓取动态页面（Playwright）
+## 5) 抓取动态页面（Playwright 账号）
 
-用户意图：抓 JS 渲染页面
+用户意图：抓 JS 渲染页面（需先 `npm install -g playwright`）
 
 ```bash
+web config set fetch pw --provider playwright
 web fetch https://news.ycombinator.com \
-  --provider playwright \
+  --account pw \
   --wait-until networkidle \
   --selector "body" \
   -f markdown
 ```
 
-## 6) 研究型任务
+## 6) 免 API key 抓取（本地 Readability 转 Markdown）
 
-用户意图：调用厂商 **research** API（需在 `[research.account.*]` 配置 tavily 或 perplexity）
+用户意图：不消耗厂商额度，本地把网页转成干净 Markdown
 
 ```bash
-web research "2026 search API pricing comparison" \
-  --max-sources 6 \
-  --cite \
-  -f markdown
+web config set fetch local --provider html2markdown
+web fetch https://en.wikipedia.org/wiki/Readability --account local -f text
 ```
 
-## 7) 问答型任务（DuckDuckGo）
-
-用户意图：快速事实问答
+## 7) 厂商原生参数（--vendor，按 provider 白名单过滤）
 
 ```bash
-web answer \
-  "What is Rust language?" \
-  --provider ddg-main \
-  --no-html \
-  --skip-disambig
+web search "AI news" --account tavily-main --vendor search_depth=advanced
+web search "latest model releases" --account pplx --vendor model=sonar-pro
+web fetch https://example.com --account fc --vendor onlyMainContent=true
 ```
 
-## 8) 问答型任务（Brave Answers）
+## 8) 配置多账号 failover（密钥池）
 
-用户意图：用 Brave answers 接口
+用户意图：同厂商多 key 轮换
 
 ```bash
-web answer \
-  "latest TypeScript version" \
-  --provider brave-answer \
-  -f json
+web config set search tavily-1 --provider tavily --token '{$TAVILY_API_KEY}'
+web config set search tavily-2 --provider tavily --token '{$TAVILY_API_KEY_BACKUP}'
+web config use search tavily-1
+# current.json 指针让 tavily-1 优先；失败后自动轮换 tavily-2，再按声明顺序试其余账号
 ```
 
-## 9) 抓取网页正文（Readability 本地转换）
+## 9) 项目级覆写
 
-用户意图：用内置 Readability + Turndown 把网页转成干净 Markdown
+用户意图：某个仓库用不同账号/参数（手写项目 overlay 文件，deep-merge 覆写全局）
 
-```bash
-web fetch https://en.wikipedia.org/wiki/Readability \
-  --provider html2markdown-main \
-  -f text
+```jsonc
+// ./.web/config.json
+{
+  "search": {
+    "account": {
+      "proj-brave": { "provider": "brave", "api_token": "{$BRAVE_API_KEY}" }
+    }
+  }
+}
 ```
 
-## 10) 多源并发搜索
+项目目录下还可用 `./.web/.env` 放项目专用 key；`{$VAR}` 解析顺序：
+process.env ← `~/.web/.env` ← `./.web/.env`（后者覆盖前者）。
 
-用户意图：同时用多个搜索引擎搜同一关键词，合并结果
-
-```bash
-web search "AI agent frameworks 2026" \
-  --providers jina-main tavily-main \
-  -f markdown
-```
-
-## 11) 多源并发问答
-
-用户意图：同时向多个问答服务提问
+## 10) JSON 输出给程序消费
 
 ```bash
-web answer \
-  "什么是量子计算" \
-  --providers ddg-main brave-answer
-```
-
-## 12) 多源并发研究
-
-用户意图：多个 **research** provider 并发（均为已注册的 research 账号，例如两个 tavily 或 tavily+perplexity）
-
-```bash
-web research "2026 前端框架趋势" \
-  --providers tavily-main perplexity-main \
-  --max-sources 8 \
-  -f markdown
-```
-
-## 13) 配置模型与顺序
-
-用户意图：配置 token 池并设优先级
-
-```bash
-web config set search kimi-1 \
-  --provider kimi \
-  --token '{$MOONSHOT_API_KEY}'
-
-web config set search kimi-2 \
-  --provider kimi \
-  --token '{$MOONSHOT_API_KEY_BACKUP}'
-
-# 先试 kimi-1 再试 kimi-2：在 ~/.web/config.toml 里把 [search.account.kimi-1] 整块写在 [search.account.kimi-2] 上面
+web search "node.js" -f json --limit 3
 ```

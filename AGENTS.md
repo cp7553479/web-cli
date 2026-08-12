@@ -90,8 +90,33 @@ use this without modification?"* If yes → core. If no → domain.
     includes the build). State the result honestly in the change description.
 15. When changing commands, flags, config shape, or provider behavior, update
     **all of**: `SPEC.md`, `docs/provider-apis.md`, `README.md`,
-    `README_CN.md`, `init/skills/web-cli/*`, and the relevant tests — in the
-    same change.
+    `README_CN.md`, the **skill copies** (see the Skills section below), and
+    the relevant tests — in the same change.
+
+## Skills (Agent 技能文档)
+
+### 位置（三处，内容必须一致）
+
+| 位置 | 角色 |
+|---|---|
+| `init/skills/web-cli/` | **发布源**（随 npm 包 `files` 发布；改动只在这里写） |
+| `.claude/skills/web-cli/` | 仓库内 Agent 读取的副本，与发布源逐字节一致 |
+| `~/.web/skills/web-cli/` | 用户机上的安装副本（v2 无 onboard，改完手动同步） |
+
+### SKILL 要求
+
+1. 只写**当前存在**的命令 / flag / provider。写或改之前对照
+   `src/web/cli/commands/*` 与 `src/web/providers/catalog.ts` 核实，
+   不凭记忆、不从旧版本继承。
+2. 示例必须可直接运行：真实命令、真实 flag、真实 provider id；密钥一律写
+   `{$ENV_VAR}` 引用，绝不写真实 key。
+3. `SKILL.md` frontmatter 的 `description` 必须反映当前实际能力（能力增删
+   时同步改）。
+4. 命令 / flag / 配置结构 / provider 行为变更时，三处副本在**同一提交**内
+   同步（规则 15）。
+5. 同步后抽查 `web <cmd> --help` 输出与文档一致。
+6. 模板镜像同步：`init/config.json` 与 `init/.env.example` 必须和
+   `src/web/config/defaults.ts` 的内置默认值一致。
 
 ## Layer map (where things live)
 

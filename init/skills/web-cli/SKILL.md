@@ -1,11 +1,13 @@
 ---
 name: web-cli
-description: Use the `web` CLI for web search, fetch page content, deep research via vendor APIs, and quick Q&A.
+description: Use the `web` CLI for web search and fetching page content via official provider APIs, with multi-account failover.
 ---
 
 # web CLI
 
-Unified CLI that talks to multiple vendor APIs (Jina, Tavily, Brave, Perplexity, DuckDuckGo, Firecrawl, Playwright, etc.) for web operations.
+Unified CLI for **web search** and **page fetch** over multi-provider accounts
+(Brave, Tavily, Jina, Firecrawl, Perplexity, plus keyless `http` /
+`html2markdown` / `playwright` fetchers). HTTP goes through the system `curl`.
 
 ## Install from npm
 
@@ -13,6 +15,7 @@ Unified CLI that talks to multiple vendor APIs (Jina, Tavily, Brave, Perplexity,
 
 ```bash
 npm install -g @cp7553479/web-cli
+web --version
 ```
 
 ## search — find web pages by keyword
@@ -24,8 +27,10 @@ web search "query"
 web search "query" --site github.com npmjs.com
 web search "query" --country US --language en --freshness week
 web search "query" --limit 10
-web search "query" --providers jina-main tavily-main    # concurrent multi-source
+web search "query" --account tavily-main      # pin one configured account
 ```
+
+`--freshness` accepts `day|week|month|year`.
 
 ## fetch — get the content of a web page
 
@@ -34,28 +39,12 @@ Extracts the main text/markdown from one or more URLs.
 ```bash
 web fetch https://example.com
 web fetch https://a.com https://b.com -f markdown
-web fetch https://spa.example.com --provider playwright --wait-until networkidle
+web fetch https://spa.example.com --account pw --wait-until networkidle   # playwright account
 web fetch https://example.com --selector "article"
 ```
 
-## research — deep research via vendor API
-
-Calls the vendor's dedicated research endpoint (e.g. Tavily, Perplexity). This is **not** a local search-then-fetch pipeline.
-
-```bash
-web research "topic" --max-sources 6
-web research "topic" --providers tavily-main perplexity-main
-```
-
-## answer — quick Q&A
-
-Gets a direct answer from a Q&A vendor API (DuckDuckGo, Brave, Firecrawl, etc.).
-
-```bash
-web answer "question"
-web answer "question about this page" --url https://example.com
-web answer "question" --providers ddg-main brave-answer
-```
+Fetch output longer than 100k chars is **not** printed; it is saved to
+`.web/temp/<timestamp>.md` and the file path is reported instead.
 
 ## Global options
 
@@ -64,39 +53,49 @@ Place these between `web` and the subcommand:
 ```bash
 web -f markdown search "query"
 web --max-length 20000 fetch https://example.com
-web --timeout-ms 30000 research "topic"
 ```
 
-
-| Option                  | Default | Purpose         |
-| ----------------------- | ------- | --------------- |
-| `-f json|markdown|text` | `text`  | Output format   |
-| `--max-length N`        | `10000` | Truncate output |
-| `--timeout-ms N`        | `15000` | Request timeout |
-
+| Option                  | Default | Purpose             |
+| ----------------------- | ------- | ------------------- |
+| `-f json\|markdown\|text` | `text`  | Output format       |
+| `--max-length N`        | `10000` | Truncate output     |
+| `--timeout-ms N`        | `15000` | Per-request timeout |
 
 ## Routing options
 
-Available on all four commands:
+Available on `search` and `fetch`:
 
+| Option              | Purpose                                          |
+| ------------------- | ------------------------------------------------ |
+| `--account <alias>` | Pin one account from config                      |
+| `--provider <name>` | Pin one provider type (or account alias)         |
+| `--vendor k=v`      | Provider-native param (repeatable, allowlisted)  |
 
-| Option                | Purpose                                  |
-| --------------------- | ---------------------------------------- |
-| `--account <id>`      | Use a specific account from config       |
-| `--provider <vendor>` | Use a specific vendor                    |
-| `--providers a b c`   | Concurrent multi-source (results merged) |
-| `--vendor k=v`        | Pass vendor-specific parameters          |
+With neither flag, requests **fail over**: the active account (pointer in
+`current.json`) is tried first, then the remaining accounts in declaration
+order. Every failure is classified and logged, then the next account is tried;
+the command fails only when all accounts have failed, printing a per-account
+breakdown (`SEARCH_ALL_FAILED` / `FETCH_ALL_FAILED`).
 
-
-If none specified, accounts are tried in the order declared in `config.toml`.
-
-## Config & logs
+## Config & accounts
 
 ```bash
-web config list                         # show active config
+web config init                                                  # ~/.web/config.json + .env
+web config set search tavily-main --provider tavily --token '{$TAVILY_API_KEY}'
+web config use search tavily-main                                # set active account pointer
+web config list                                                  # accounts (tokens masked)
+web config doctor                                                # self-check: config/curl/env
+web provider list                                                # built-in + plugin providers
+web provider models perplexity                                   # known models
 ```
 
-Logs: `<cwd>/.web/logs/*.log`
+Files: `~/.web/config.json` (global) + `./.web/config.json` (project overlay,
+deep-merged); active-account pointers live in the **separate** `current.json`.
+Tokens are plaintext or `{$ENV_VAR}` references resolved from the process
+environment, then `~/.web/.env`, then `./.web/.env`.
+
+Logs: `~/.web/logs/*.log` (or `./.web/logs/` when a project config exists).
+Raw requests/responses go to logs, never stdout.
 
 ## Troubleshooting
 
