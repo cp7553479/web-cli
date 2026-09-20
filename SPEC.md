@@ -287,6 +287,9 @@ Provider × capability matrix:
 | perplexity |   ✓    |       |        | `/v1/sonar`; returns grounded answer + `search_results[]` |
 | exa        |   ✓    |       |        | `POST /search`, `x-api-key`; `includeDomains`/`startPublishedDate` |
 | serper     |   ✓    |       |   ✓    | `X-API-KEY`; web `POST /search` + images `POST /images` |
+| zhipu      |   ✓    |       |        | GLM ask + standalone `POST /web_search` (`search_result[]`) |
+| volcengine |   ✓    |       |        | Doubao chat + `web_search` tool (citations extracted) |
+| minimax    |   ✓    |       |        | M2 chat + `web_search_20250305` tool (citations extracted) |
 | searxng    |   ✓    |       |        | self-hosted; `GET {base_url}/search?format=json` (base_url required) |
 | pixabay    |        |       |   ✓    | `GET /api/?key=…` (free key); `hits[]` → `largeImageURL`/`tags` |
 | pexels     |        |       |   ✓    | `GET /v1/search`, `Authorization` (free key); `photos[]` → `src`/`alt` |
@@ -308,7 +311,7 @@ token-plan) are the same vendor reached through a different account
 | deepseek   | OpenAI Chat | api.deepseek.com | deepseek-chat | — |
 | kimi       | OpenAI Chat | api.moonshot.cn/v1 | kimi-k3 | builtin_function $web_search |
 | volcengine | OpenAI Chat | ark.cn-beijing.volces.com/api/v3 (plan: /api/plan/v3) | doubao-seed-1-6-flash-250615 | web_search |
-| bailian    | OpenAI Chat | dashscope compatible-mode (or dedicated maas base) | qwen-flash | enable_search |
+| bailian    | OpenAI Chat | dashscope compatible-mode (plan base_url variants) | qwen-flash | enable_search |
 | minimax    | OpenAI Chat | api.minimax.chat/v1 | MiniMax-M2 | — |
 | openrouter | OpenAI Chat | openrouter.ai/api/v1 | moonshotai/kimi-k2.6 | web plugin |
 | zai        | OpenAI Chat | api.z.ai/api/paas/v4 (coding: /api/coding/paas/v4) | glm-4.5-flash | web_search |

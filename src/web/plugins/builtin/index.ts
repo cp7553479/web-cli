@@ -3,8 +3,9 @@ import { activate as brave } from "./brave";
 import {
   activateBailian, activateChatgpt, activateClaude, activateDeepseek, activateGemini,
   activateGrok, activateKimi, activateMinimax, activateOpenrouter, activateVolcengine,
-  activateZai, activateZhipu,
+  activateZai,
 } from "./llm/vendors";
+import { activateZhipu } from "./zhipu";
 import { activate as exa } from "./exa";
 import { activate as firecrawl } from "./firecrawl";
 import { activate as html2markdown } from "./html2markdown";

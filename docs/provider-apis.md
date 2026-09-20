@@ -143,6 +143,46 @@ Volcengine console (plan endpoint rejected doubao-evolop-latest).
 Note: zhipu/zai coding plans are plain REST protocols (Anthropic Messages and
 OpenAI Responses / Chat Completions) — no MCP handshake required for API use.
 
+## Zhipu (BigModel) Web Search
+
+- **Endpoint**: `POST https://open.bigmodel.cn/api/paas/v4/web_search`
+- **Auth**: `Authorization: Bearer <key>`
+- Body: `search_query` (required, max 70 chars), `search_engine`
+  (`search_std` | `search_pro` | `search_pro_sogou` | `search_pro_quark`),
+  `search_intent` (boolean), `count` (1–50), `search_domain_filter`,
+  `search_recency_filter` (`oneDay|oneWeek|oneMonth|oneYear|noLimit`),
+  `content_size` (`medium|high`).
+- Response: `search_result[]` with `title`, `content` (summary), `link`,
+  `media` (site name), `icon`, `refer` (citation index), `publish_date`.
+- Verified against official docs (2026-09-20); live call reaches the API
+  (1113 = no active search resource pack on the key).
+
+## Volcengine Ark / MiniMax tool extraction
+
+Both vendors have no standalone search endpoint; the search capability calls
+their chat APIs with the vendor web-search tool and extracts citations:
+
+- **volcengine**: `POST {ark}/v3/chat/completions` (Bearer), body carries
+  `tools: [{type: "web_search"}]`; results are read from
+  `choices[].message.annotations` (`title`/`url`). The account's
+  console-granted models apply (ungranted ids return
+  `InvalidEndpointOrModel.NotFound`).
+- **minimax**: `POST https://api.minimax.chat/anthropic/v1/messages`
+  (`x-api-key` + `anthropic-version`), body carries
+  `tools: [{type: "web_search_20250305", name: "web_search"}]`; results are
+  read from `content[]` blocks of type `web_search_tool_result`
+  (`{title, url}` items).
+- Verified live 2026-09-20 (auth and request shape accepted; blocked only by
+  console model grants / balance).
+
+## Bailian web-search MCP (not integrated)
+
+Bailian exposes network search as an MCP service enabled per-account in the
+Bailian console (MCP marketplace; 2000 free calls then metered). The MCP
+endpoint URL is provisioned per account and is not publicly documented in a
+programmable form, so it is not integrated. Enable the service in the console
+and point a custom plugin at the provisioned URL if needed.
+
 ## Not supported
 
 - **Bing Web Search** — Microsoft retired the API (Aug 2025); no new signups.

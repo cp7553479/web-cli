@@ -33,12 +33,12 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
   { providerId: "grok", aliases: ["xai"], defaultBaseUrl: "https://api.x.ai/v1", description: "xAI Grok + live search", capabilities: ["ask"] },
   { providerId: "deepseek", aliases: [], defaultBaseUrl: "https://api.deepseek.com", description: "DeepSeek chat (no web-search tool)", capabilities: ["ask"] },
   { providerId: "kimi", aliases: ["moonshot"], defaultBaseUrl: "https://api.moonshot.cn/v1", description: "Moonshot Kimi + $web_search builtin", capabilities: ["ask"] },
-  { providerId: "volcengine", aliases: ["ark", "doubao"], defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/v3", description: "Volcengine Ark Doubao (api / agent-plan / coding-plan via base_url)", capabilities: ["ask"] },
+  { providerId: "volcengine", aliases: ["ark", "doubao"], defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/v3", description: "Volcengine Ark Doubao chat + web_search (plans via base_url)", capabilities: ["ask", "search"] },
   { providerId: "bailian", aliases: ["dashscope", "qwen"], defaultBaseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", description: "Alibaba Bailian Qwen (api / token-plan / coding-plan via base_url)", capabilities: ["ask"] },
-  { providerId: "minimax", aliases: [], defaultBaseUrl: "https://api.minimax.chat/v1", description: "MiniMax chat (api / token-plan via base_url)", capabilities: ["ask"] },
+  { providerId: "minimax", aliases: [], defaultBaseUrl: "https://api.minimax.chat/v1", description: "MiniMax M2 chat + web_search tool", capabilities: ["ask", "search"] },
   { providerId: "openrouter", aliases: [], defaultBaseUrl: "https://openrouter.ai/api/v1", description: "OpenRouter multi-LLM + web plugin", capabilities: ["ask"] },
   { providerId: "zai", aliases: ["z.ai", "zhipu-global"], defaultBaseUrl: "https://api.z.ai/api/paas/v4", description: "Z.ai GLM (api / cn-coding-plan / global-coding-plan via base_url)", capabilities: ["ask"] },
-  { providerId: "zhipu", aliases: ["bigmodel"], defaultBaseUrl: "https://open.bigmodel.cn/api/paas/v4", description: "Zhipu BigModel GLM (mainland)", capabilities: ["ask"] },
+  { providerId: "zhipu", aliases: ["bigmodel"], defaultBaseUrl: "https://open.bigmodel.cn/api/paas/v4", description: "Zhipu BigModel GLM + Web Search API (mainland)", capabilities: ["ask", "search"] },
 ];
 
 /** Built-in model lists for `web provider <id> models`. No live discovery in v1. */
