@@ -1,8 +1,8 @@
-import type { ProviderBinding, ProviderHooks, TransportRequest } from "../../core";
-import type { ProviderResponse, SearchRequest } from "../protocol/types";
-import { filterVendorParams } from "../protocol/vendor-params";
-import { bearer, ensureSuccess, parseJsonBody, resolveBaseUrl } from "./_http";
-import { makeInstance } from "./_factory";
+import type { PluginHost, ProviderBinding, ProviderHooks, TransportRequest } from "../../../core";
+import type { ProviderResponse, SearchRequest } from "../../protocol/types";
+import { filterVendorParams } from "../../protocol/vendor-params";
+import { bearer, ensureSuccess, parseJsonBody, resolveBaseUrl } from "./shared";
+import { makeFactory, makeInstance } from "./factory";
 
 const DEFAULT_BASE = "https://api.perplexity.ai";
 const DEFAULT_MODEL = "sonar";
@@ -66,4 +66,8 @@ export function createPerplexitySearch(binding: ProviderBinding) {
     },
   };
   return makeInstance(binding, hooks);
+}
+
+export function activate(host: PluginHost): void {
+  host.registerFactory("perplexity", makeFactory(["search"], { search: createPerplexitySearch }));
 }

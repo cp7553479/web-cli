@@ -17,6 +17,12 @@ export interface AccountCredentials {
   alias: string;
   apiToken?: string;
   baseUrl?: string;
+  /**
+   * Values written by the provider's config schema (see
+   * {@link ProviderConfigField}) — every extra string field on the account
+   * entry, keyed as it appears in config.json.
+   */
+  fields?: Record<string, string>;
 }
 
 /**

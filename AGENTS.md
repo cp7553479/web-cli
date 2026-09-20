@@ -9,8 +9,7 @@
 ## Project
 
 `web` is one CLI that turns **web search** and **web fetch** into reusable
-infrastructure, built on a portable abstraction layer (`src/core/`) so the same
-architecture can be lifted into other domains (e.g. image generation).
+infrastructure, built on a portable abstraction layer (`src/core/`).
 
 ## THE core boundary (most important rule)
 
@@ -22,12 +21,8 @@ architecture can be lifted into other domains (e.g. image generation).
   never the reverse.
 - Core is generic over `<Req, Res>`. It never hardcodes capability names
   ("search"/"fetch") — domains instantiate typed pools per capability.
-- Porting `src/core/` to another project = copy the folder. If a change would
-  require core to know a domain concept, that change belongs in the domain
-  layer, not core.
-
-If you are unsure whether code belongs in core, the test is: *"Could image-cli
-use this without modification?"* If yes → core. If no → domain.
+- If a change would require core to know a domain concept, that change
+  belongs in the domain layer, not core.
 
 ## Global rules
 
@@ -58,8 +53,9 @@ use this without modification?"* If yes → core. If no → domain.
 
 ### Config & secrets
 
-7. Config is JSON: `~/.web/config.json` (global) + `./.web/config.json`
-   (project overlay). `api_token` is either a literal or `{$ENV_VAR}`.
+7. Config is JSON with fallback order: `./.web/config.json` (project) wins
+   when present, else `~/.web/config.json` (auto-initialized with agent
+   skills on first run). `api_token` is either a literal or `{$ENV_VAR}`.
 8. The active-account pointer lives in the **separate** `current.json`, never
    in `config.json`.
 9. Secrets never reach logs or default stdout. Auth headers
@@ -77,7 +73,7 @@ use this without modification?"* If yes → core. If no → domain.
 
 12. Minimize dependencies. Admit a library only when a Node built-in or `curl`
     cannot do the job. Current allowed: `commander`, `linkedom` (html2markdown
-    DOM), `playwright` (optional browser fetch). Vendor JS (`Readability`,
+    DOM), `playwright` (browser fetch). Vendor JS (`Readability`,
     `turndown`) is permitted in `src/vendor/`.
 
 ### Testing & delivery
@@ -90,45 +86,22 @@ use this without modification?"* If yes → core. If no → domain.
     includes the build). State the result honestly in the change description.
 15. When changing commands, flags, config shape, or provider behavior, update
     **all of**: `SPEC.md`, `docs/provider-apis.md`, `README.md`,
-    `README_CN.md`, the **skill copies** (see the Skills section below), and
-    the relevant tests — in the same change.
-
-## Skills (Agent 技能文档)
-
-### 位置（三处，内容必须一致）
-
-| 位置 | 角色 |
-|---|---|
-| `init/skills/web-cli/` | **发布源**（随 npm 包 `files` 发布；改动只在这里写） |
-| `.claude/skills/web-cli/` | 仓库内 Agent 读取的副本，与发布源逐字节一致 |
-| `~/.web/skills/web-cli/` | 用户机上的安装副本（v2 无 onboard，改完手动同步） |
-
-### SKILL 要求
-
-1. 只写**当前存在**的命令 / flag / provider。写或改之前对照
-   `src/web/cli/commands/*` 与 `src/web/providers/catalog.ts` 核实，
-   不凭记忆、不从旧版本继承。
-2. 示例必须可直接运行：真实命令、真实 flag、真实 provider id；密钥一律写
-   `{$ENV_VAR}` 引用，绝不写真实 key。
-3. `SKILL.md` frontmatter 的 `description` 必须反映当前实际能力（能力增删
-   时同步改）。
-4. 命令 / flag / 配置结构 / provider 行为变更时，三处副本在**同一提交**内
-   同步（规则 15）。
-5. 同步后抽查 `web <cmd> --help` 输出与文档一致。
-6. 模板镜像同步：`init/config.json` 与 `init/.env.example` 必须和
-   `src/web/config/defaults.ts` 的内置默认值一致。
+    `README_CN.md`, and the relevant tests — in the same change.
+16. Docs record behavior, decisions, and non-obvious constraints — nothing
+    else. No environment trivia ("curl ships with macOS"), no manual setup
+    steps: anything a user would have to install belongs in `package.json`.
 
 ## Layer map (where things live)
 
 | Concern | Location |
 |---|---|
 | Portable abstraction | `src/core/` |
-| web domain types (Search/Fetch/ResultItem) | `src/web/protocol/` |
+| web domain types (Search/Fetch/Image/Ask/ResultItem) | `src/web/protocol/` |
 | web config schema, defaults, materialize | `src/web/config/` |
-| Provider implementations | `src/web/providers/` |
+| Provider plugins (all providers, incl. built-ins) | `src/web/plugins/builtin/` + `~/.web/plugins/<id>/` |
 | CLI commands | `src/web/cli/commands/` |
 | Output rendering | `src/web/output/` |
-| External plugins | `~/.web/plugins/<id>/` (loaded by `src/web/plugins/`) |
+| Plugin loading (built-in + external) | `src/web/plugins/` (`loadPlugins`) |
 
 Local (per-directory) `AGENTS.md` files may be added later for directory-
 specific rules; they must not contradict this file.

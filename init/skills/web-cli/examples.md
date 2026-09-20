@@ -76,12 +76,13 @@ web fetch https://example.com --account fc --vendor onlyMainContent=true
 web config set search tavily-1 --provider tavily --token '{$TAVILY_API_KEY}'
 web config set search tavily-2 --provider tavily --token '{$TAVILY_API_KEY_BACKUP}'
 web config use search tavily-1
-# current.json 指针让 tavily-1 优先；失败后自动轮换 tavily-2，再按声明顺序试其余账号
+# current.json 指针让 tavily-1 优先；失败后自动轮换（可配 primary/list 优先级、
+# 15 分钟账号冷却与多轮遍历，详见 README「故障转移」）
 ```
 
-## 9) 项目级覆写
+## 9) 项目级配置
 
-用户意图：某个仓库用不同账号/参数（手写项目 overlay 文件，deep-merge 覆写全局）
+用户意图：某个仓库用不同账号/参数（`./.web/config.json` 存在时项目作用域整体生效）
 
 ```jsonc
 // ./.web/config.json

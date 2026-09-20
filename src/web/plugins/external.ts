@@ -4,6 +4,9 @@ import os from "node:os";
 import path from "node:path";
 
 import { errorLog, type PluginHost } from "../../core";
+import type { WebPlugin } from "./types";
+
+export type { WebPlugin };
 
 const nodeRequire = createRequire(path.join(__dirname, "external.js"));
 
@@ -11,12 +14,6 @@ export interface WebPluginManifest {
   id: string;
   main: string;
   version?: string;
-}
-
-export interface WebPlugin {
-  id: string;
-  version?: string;
-  activate(host: PluginHost): void;
 }
 
 export function getUserPluginsRoot(): string {

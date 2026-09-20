@@ -1,34 +1,33 @@
 import fs from "node:fs";
-import { spawn } from "node:child_process";
 
 import { Command } from "commander";
 
-import { AppError, getAppPaths, loadAppEnv } from "../../../core";
+import { AppError, getAppPaths, PluginHost, type ProviderConfigField } from "../../../core";
 import {
   APP_NAME,
   DEFAULT_CONFIG_JSON,
   DEFAULT_ENV_EXAMPLE,
-  loadGlobalWebConfigRaw,
-  loadWebConfig,
+  installSkills,
+  loadActiveConfigRaw,
   maskToken,
   removeAccount,
-  saveGlobalWebConfig,
+  saveActiveConfig,
   setAccount,
   writeActivePointer,
   type AccountConfig,
 } from "../../config";
 import { SEGMENTS, type SegmentName, type WebConfig } from "../../config/types";
-import { materializeRegistries } from "../../config/materialize";
-import { PluginHost } from "../../../core";
-import { registerBuiltinFactories } from "../../providers";
+import { findCatalogEntry } from "../../plugins/builtin/catalog";
+import { loadPlugins } from "../../plugins";
+import { collectFieldValues, interactiveIo, seededIo } from "../../config/provider-fields";
 
 export function registerConfigCommand(program: Command): void {
   const cmd = program.command("config").description("View and edit ~/.web/config.json");
 
   cmd
     .command("init")
-    .description("Write the default config.json + .env (non-interactive); --force overwrites")
-    .option("--force", "overwrite an existing config.json")
+    .description("Write the default config.json + .env and install agent skills; --force overwrites")
+    .option("--force", "overwrite an existing config.json and installed skill files")
     .action((opts: { force?: boolean }) => {
       const paths = getAppPaths(APP_NAME);
       fs.mkdirSync(paths.globalRoot, { recursive: true });
@@ -46,9 +45,67 @@ export function registerConfigCommand(program: Command): void {
       } else {
         skipped.push(paths.globalEnv);
       }
-      process.stdout.write(`Created:\n${created.map((p) => `  ${p}`).join("\n") || "  (none)"}\n`);
+      const skills = installSkills(opts.force);
+      created.push(...skills.created);
+      skipped.push(...skills.skipped);
+      if (created.length) process.stdout.write(`Created:\n${created.map((p) => `  ${p}`).join("\n")}\n`);
+      else process.stdout.write("Created:\n  (none)\n");
       if (skipped.length) process.stdout.write(`Skipped:\n${skipped.map((p) => `  ${p}`).join("\n")}\n`);
       process.stdout.write(`\nNext: edit ${paths.globalConfig} or run 'web config set <group> <alias> --provider <p> --token <key>'.\n`);
+    });
+
+  cmd
+    .command("add <group> <alias>")
+    .description("Add an account guided by the provider's config schema (menus in a TTY; --field pre-answers)")
+    .requiredOption("--provider <idOrAlias>", "provider id or catalog alias")
+    .option("--token <token>", "api token (literal or {$ENV})")
+    .option("--field <key=value>", "pre-answer one schema field (repeatable)", (value: string, previous: string[] = []) => [...previous, value])
+    .action(async (group: string, alias: string, opts: { provider: string; token?: string; field?: string[] }) => {
+      const segment = asSegment(group);
+      const { config, paths } = loadActiveConfigRaw();
+
+      const host = new PluginHost();
+      loadPlugins(host);
+      const providerId = findCatalogEntry(opts.provider)?.providerId ?? opts.provider;
+      const factory = host.getFactory(providerId);
+      if (!factory) {
+        throw new AppError(`Unknown provider '${opts.provider}'. Available: ${host.listFactories().join(", ")}`, "PROVIDER_NOT_FOUND");
+      }
+      if (!factory.capabilities.includes(segment)) {
+        throw new AppError(`Provider '${providerId}' does not support '${segment}' (capabilities: ${factory.capabilities.join(", ")}).`, "CAPABILITY_UNSUPPORTED");
+      }
+
+      const seed: Record<string, string> = {};
+      for (const pair of opts.field ?? []) {
+        const eq = pair.indexOf("=");
+        if (eq <= 0) {
+          throw new AppError(`--field expects key=value, got '${pair}'.`, "INVALID_PARAM");
+        }
+        seed[pair.slice(0, eq)] = pair.slice(eq + 1);
+      }
+
+      const fields = factory.config ?? fallbackFields(providerId);
+      const interactive = Boolean(process.stdin.isTTY);
+      const handle = interactive ? interactiveIo() : undefined;
+      const io = handle?.io ?? seededIo(seed);
+      let values: Record<string, string>;
+      try {
+        values = await collectFieldValues(fields, io);
+      } finally {
+        handle?.close();
+      }
+
+      const account: AccountConfig = { provider: providerId };
+      if (opts.token) account.api_token = opts.token;
+      Object.assign(account, values);
+      const next = setAccount(config, segment, alias, account);
+      saveActiveConfig(next, paths);
+
+      const written = Object.entries(account)
+        .filter(([key]) => key !== "provider")
+        .map(([key, value]) => `  ${key} = ${key === "api_token" ? maskToken(String(value)) : value}`);
+      process.stdout.write(`added [${segment}.account.${alias}] provider=${providerId}\n`);
+      if (written.length) process.stdout.write(`${written.join("\n")}\n`);
     });
 
   cmd
@@ -75,7 +132,7 @@ export function registerConfigCommand(program: Command): void {
     .description("Print the resolved global config with masked keys")
     .option("--json", "emit raw JSON")
     .action((opts: { json?: boolean }) => {
-      const { config } = loadGlobalWebConfigRaw();
+      const { config } = loadActiveConfigRaw();
       const masked = maskConfigTokens(config);
       if (opts.json) {
         process.stdout.write(`${JSON.stringify(masked, null, 2)}\n`);
@@ -88,11 +145,18 @@ export function registerConfigCommand(program: Command): void {
     .command("list")
     .description("List configured accounts per group (keys masked)")
     .action(() => {
-      const { config } = loadGlobalWebConfigRaw();
+      const { config } = loadActiveConfigRaw();
       const lines: string[] = [];
       for (const segment of SEGMENTS) {
         const accounts = config[segment]?.account ?? {};
         lines.push(`[${segment}]`);
+        const providers = config[segment]?.providers;
+        if (providers?.primary || providers?.list?.length) {
+          const parts: string[] = [];
+          if (providers.primary) parts.push(`primary=${providers.primary}`);
+          if (providers.list?.length) parts.push(`list=[${providers.list.join(",")}]`);
+          lines.push(`  ${parts.join("  ")}`);
+        }
         const entries = Object.entries(accounts);
         if (entries.length === 0) {
           lines.push("  (no accounts)");
@@ -114,7 +178,7 @@ export function registerConfigCommand(program: Command): void {
     .option("--base-url <url>", "override default endpoint")
     .option("--enabled <bool>", "enable/disable", "true")
     .action((group: string, alias: string, opts: { provider: string; token?: string; baseUrl?: string; enabled: string }) => {
-      const { config, paths } = loadGlobalWebConfigRaw();
+      const { config, paths } = loadActiveConfigRaw();
       const account: AccountConfig = {
         provider: opts.provider,
         api_token: opts.token,
@@ -122,7 +186,7 @@ export function registerConfigCommand(program: Command): void {
         enabled: opts.enabled !== "false",
       };
       const next = setAccount(config, asSegment(group), alias, account);
-      saveGlobalWebConfig(next, paths);
+      saveActiveConfig(next, paths);
       process.stdout.write("ok\n");
     });
 
@@ -130,9 +194,9 @@ export function registerConfigCommand(program: Command): void {
     .command("remove <group> <alias>")
     .description("Remove an account entry")
     .action((group: string, alias: string) => {
-      const { config, paths } = loadGlobalWebConfigRaw();
+      const { config, paths } = loadActiveConfigRaw();
       const next = removeAccount(config, asSegment(group), alias);
-      saveGlobalWebConfig(next, paths);
+      saveActiveConfig(next, paths);
       process.stdout.write("ok\n");
     });
 
@@ -141,32 +205,12 @@ export function registerConfigCommand(program: Command): void {
     .description("Set the active default account for a group (writes current.json)")
     .action((group: string, alias: string) => {
       const segment = asSegment(group);
-      const { config, paths } = loadGlobalWebConfigRaw();
+      const { config, paths } = loadActiveConfigRaw();
       if (!config[segment]?.account?.[alias]) {
         throw new AppError(`Account '${alias}' not found in [${segment}].`, "ACCOUNT_NOT_FOUND");
       }
       writeActivePointer(paths, segment, alias);
       process.stdout.write(`ok (active ${segment} = ${alias})\n`);
-    });
-
-  cmd
-    .command("doctor")
-    .description("Self-check: config, curl, accounts, {$ENV} references")
-    .option("--json", "emit raw JSON")
-    .action(async (opts: { json?: boolean }) => {
-      const report = await runDoctor();
-      if (opts.json) {
-        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-        return;
-      }
-      const lines: string[] = [];
-      lines.push(`config: ${report.configOk ? "ok" : "FAIL " + report.configError}`);
-      lines.push(`curl: ${report.curlAvailable ? "ok" : "missing"}`);
-      for (const a of report.accounts) {
-        const flag = a.factoryOk && a.envOk ? "ok" : "warn";
-        lines.push(`  [${a.segment}.${a.alias}] provider=${a.provider} factory=${a.factoryOk ? "ok" : "MISSING"} env=${a.envOk ? "ok" : "UNRESOLVED"} ${flag === "warn" ? "(warn)" : ""}`);
-      }
-      process.stdout.write(`${lines.join("\n")}\n`);
     });
 }
 
@@ -177,6 +221,13 @@ function asSegment(group: string): SegmentName {
   return group as SegmentName;
 }
 
+/** Fields offered when a provider declares no schema: its base URL (if any). */
+function fallbackFields(providerId: string): ProviderConfigField[] {
+  const entry = findCatalogEntry(providerId);
+  if (!entry?.defaultBaseUrl) return [];
+  return [{ key: "base_url", label: `Base URL (default ${entry.defaultBaseUrl})` }];
+}
+
 function maskConfigTokens(config: WebConfig): WebConfig {
   const clone = structuredClone(config);
   for (const segment of SEGMENTS) {
@@ -185,59 +236,4 @@ function maskConfigTokens(config: WebConfig): WebConfig {
     }
   }
   return clone;
-}
-
-interface DoctorReport {
-  configOk: boolean;
-  configError?: string;
-  curlAvailable: boolean;
-  accounts: Array<{ segment: string; alias: string; provider: string; factoryOk: boolean; envOk: boolean; envError?: string }>;
-}
-
-async function runDoctor(): Promise<DoctorReport> {
-  const report: DoctorReport = { configOk: false, curlAvailable: false, accounts: [] };
-
-  // Config + env resolution check (merged view).
-  try {
-    loadWebConfig();
-    report.configOk = true;
-  } catch (error) {
-    report.configError = error instanceof Error ? error.message : String(error);
-  }
-
-  report.curlAvailable = await hasCurl();
-
-  // Factory + env-token presence check (global raw view, no resolution).
-  // env check uses the same layered sources as runtime resolution
-  // (process.env ← ~/.web/.env ← project .env), not bare process.env.
-  const { config, paths } = loadGlobalWebConfigRaw();
-  const layeredEnv = loadAppEnv(paths);
-  const host = new PluginHost();
-  registerBuiltinFactories(host);
-  const { skipped } = materializeRegistries(config, host);
-  const skippedKey = new Set(skipped.map((s) => `${s.segment}:${s.alias}`));
-  for (const segment of SEGMENTS) {
-    for (const [alias, account] of Object.entries(config[segment]?.account ?? {})) {
-      const factoryOk = !skippedKey.has(`${segment}:${alias}`);
-      const envMatch = account.api_token?.match(/^\{\$([A-Z0-9_]+)\}$/);
-      const envOk = !envMatch || Boolean(layeredEnv[envMatch[1]]);
-      report.accounts.push({
-        segment,
-        alias,
-        provider: account.provider,
-        factoryOk,
-        envOk,
-        envError: envMatch && !envOk ? `env '${envMatch[1]}' unset` : undefined,
-      });
-    }
-  }
-  return report;
-}
-
-function hasCurl(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const child = spawn("curl", ["--version"], { stdio: "ignore" });
-    child.on("error", () => resolve(false));
-    child.on("close", (code) => resolve(code === 0));
-  });
 }

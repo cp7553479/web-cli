@@ -12,11 +12,17 @@ const ENTRY = path.resolve(__dirname, "..", "..", "dist", "index.js");
 /**
  * Runs the built CLI (`dist/index.js`) as a subprocess with an isolated HOME,
  * so config tests never touch the developer's real ~/.web. Returns captured
- * stdout/stderr/exit-code. Caller passes extra env (e.g. API keys) as needed.
+ * stdout/stderr/exit-code. Caller passes extra env (e.g. API keys) as needed;
+ * `cwd` overrides the subprocess working directory (defaults to repo root).
  */
-export function runWeb(args: string[], env: Record<string, string> = {}): Promise<RunResult> {
+export function runWeb(
+  args: string[],
+  env: Record<string, string> = {},
+  cwd?: string,
+): Promise<RunResult> {
   return new Promise((resolve) => {
     const child = spawn("node", [ENTRY, ...args], {
+      cwd,
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });

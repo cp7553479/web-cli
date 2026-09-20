@@ -1,8 +1,8 @@
-import type { ProviderBinding, ProviderHooks, TransportRequest } from "../../core";
-import type { FetchRequest, ProviderResponse, SearchRequest } from "../protocol/types";
-import { filterVendorParams } from "../protocol/vendor-params";
-import { bearer, ensureSuccess, parseJsonBody } from "./_http";
-import { makeInstance } from "./_factory";
+import type { PluginHost, ProviderBinding, ProviderHooks, TransportRequest } from "../../../core";
+import type { FetchRequest, ProviderResponse, SearchRequest } from "../../protocol/types";
+import { filterVendorParams } from "../../protocol/vendor-params";
+import { bearer, ensureSuccess, parseJsonBody } from "./shared";
+import { makeFactory, makeInstance } from "./factory";
 
 const SEARCH_HOST = "https://s.jina.ai";
 const READER_HOST = "https://r.jina.ai";
@@ -78,4 +78,11 @@ export function createJinaFetch(binding: ProviderBinding) {
     },
   };
   return makeInstance(binding, hooks);
+}
+
+export function activate(host: PluginHost): void {
+  host.registerFactory("jina", makeFactory(["search", "fetch"], {
+    search: createJinaSearch,
+    fetch: createJinaFetch,
+  }));
 }

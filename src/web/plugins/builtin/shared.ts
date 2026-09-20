@@ -1,4 +1,4 @@
-import { ProviderError, classifyHttpStatus, type TransportResult } from "../../core";
+import { ProviderError, classifyHttpStatus, type TransportResult } from "../../../core";
 
 /**
  * Parses a JSON response body or throws a non-retryable ProviderError. Callers

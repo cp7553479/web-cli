@@ -18,11 +18,22 @@ export {
   type ProviderHooks,
   type ProviderInstance,
   type ProviderFactory,
+  type ProviderConfigField,
+  type ProviderConfigOption,
 } from "./protocol/provider";
 
 export { ProviderRegistry } from "./protocol/registry";
 export { ProviderPool, type ProviderPoolOptions } from "./protocol/pool";
 export { PluginHost } from "./protocol/plugin-host";
+export {
+  DEFAULT_LOCK_TTL_MS,
+  readLocks,
+  activeLock,
+  lockAccount,
+  clearLock,
+  type LockEntry,
+  type LockFileData,
+} from "./protocol/locks";
 export type {
   HookCtx,
   AccountCredentials,
@@ -43,7 +54,6 @@ export {
   loadAppConfig,
   loadAppEnv,
   loadCurrentPointer,
-  deepMerge,
   resolveEnvTokens,
   type LoadedConfig,
   type LoadAppConfigOptions,

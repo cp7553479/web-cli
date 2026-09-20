@@ -10,6 +10,7 @@ import {
 } from "../../protocol/requests";
 import { parseLooseVendor, parseVendorPairs } from "../../protocol/vendor-params";
 import { render } from "../../output/render";
+import { emitResult } from "../../output/emit";
 
 const KNOWN_LONG_FLAGS = new Set([
   "site", "country", "freshness", "limit", "language", "safesearch",
@@ -36,7 +37,7 @@ export function registerSearchCommand(program: Command): void {
       if (options.freshness) requireOneOf(options.freshness, FRESHNESS_VALUES, "--freshness");
 
       const flags = toGlobalFlags(command.parent?.opts() ?? {});
-      const { config, searchPool, logger } = createAppContext(flags);
+      const { config, searchPool, logger, paths } = createAppContext(flags);
       logger?.log("cli.command", { command: "search", args: { text, ...options } });
 
       const vendorParams = {
@@ -62,8 +63,8 @@ export function registerSearchCommand(program: Command): void {
       });
 
       const group = config.search;
-      const output = render(result, flags.format, flags.maxLength, group.inject_before, group.inject_after);
-      process.stdout.write(`${output}\n`);
+      const output = render(result, flags.format, group.inject_before, group.inject_after);
+      emitResult(output, flags, paths);
     });
 }
 

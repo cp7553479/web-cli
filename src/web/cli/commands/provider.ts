@@ -1,9 +1,9 @@
 import { Command } from "commander";
 
-import { PROVIDER_CATALOG, PROVIDER_MODELS, findCatalogEntry } from "../../providers/catalog";
-import { loadExternalPlugins, getUserPluginsRoot } from "../../plugins/external";
+import { loadActiveConfigRaw } from "../../config";
+import { PROVIDER_CATALOG, PROVIDER_MODELS, findCatalogEntry } from "../../plugins/builtin/catalog";
+import { loadPlugins, getUserPluginsRoot } from "../../plugins";
 import { PluginHost } from "../../../core";
-import { registerBuiltinFactories } from "../../providers";
 
 export function registerProviderCommand(program: Command): void {
   const cmd = program.command("provider").description("Inspect built-in and plugin providers");
@@ -21,7 +21,8 @@ export function registerProviderCommand(program: Command): void {
       const lines: string[] = [];
       for (const e of entries) {
         const alias = e.aliases.length ? `  aliases=${e.aliases.join(",")}` : "";
-        lines.push(`${e.providerId}  [${e.capabilities.join(",")}]  ${e.defaultBaseUrl || "(none)"}${alias}`);
+        const enabled = e.enabled ? "" : "  enabled=false";
+        lines.push(`${e.providerId}  [${e.capabilities.join(",")}]  ${e.defaultBaseUrl || "(none)"}${alias}${enabled}`);
       }
       process.stdout.write(`${lines.join("\n")}\n`);
     });
@@ -59,13 +60,14 @@ function collectProviderEntries() {
     description: e.description,
   }));
   // Surface plugin-registered factory names not already in the catalog.
-  const host = new PluginHost();
-  registerBuiltinFactories(host);
-  loadExternalPlugins(host);
+  const host: PluginHost = new PluginHost();
+  loadPlugins(host);
+  const { config } = loadActiveConfigRaw();
   const known = new Set(PROVIDER_CATALOG.map((e) => e.providerId));
   const plugins = host
     .listFactories()
     .filter((name) => !known.has(name))
     .map((name) => ({ providerId: name, aliases: [] as string[], capabilities: [] as string[], defaultBaseUrl: "plugin-defined", description: "Local plugin provider" }));
-  return [...builtIn, ...plugins];
+  const isEnabled = (providerId: string) => config.providers?.[providerId]?.enabled !== false;
+  return [...builtIn, ...plugins].map((e) => ({ ...e, enabled: isEnabled(e.providerId) }));
 }

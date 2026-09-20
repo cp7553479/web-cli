@@ -53,9 +53,43 @@ export interface ProviderInstance<Req, Res> {
 }
 
 /**
+ * One selectable option inside a provider config field. `value` is what gets
+ * written to config.json; `fields` opens a nested level when this option is
+ * picked (hierarchical menus).
+ */
+export interface ProviderConfigOption {
+  label: string;
+  value: string;
+  fields?: ProviderConfigField[];
+}
+
+/**
+ * Declares ONE account field a provider understands — this is the whole
+ * schema standard, shared by menu-time and runtime:
+ *
+ * - Menu time (`web config add`): `label` + `options` render the menu; the
+ *   picked option's `value` (or a free-text answer) becomes the value.
+ * - Runtime: the value is written flat into the account entry under `key`
+ *   and handed to the factory via `ProviderBinding.fields[key]`.
+ *
+ * There is no second schema to keep in sync: what the menu writes is exactly
+ * what the runtime reads.
+ */
+export interface ProviderConfigField {
+  /** Account key in config.json (flat string value), e.g. "base_url". */
+  key: string;
+  label: string;
+  /** When present the user picks one option; when absent the field is free text. */
+  options?: ProviderConfigOption[];
+  /** Pre-selected option value / placeholder answer. */
+  default?: string;
+}
+
+/**
  * Factory registered under a provider name (e.g. "tavily"). Declares which
  * capability segments it can build and produces a {@link ProviderInstance} per
- * account binding.
+ * account binding. `config` optionally declares the account fields the user
+ * can pick in `web config add` (multiple base URLs, models, ...).
  *
  * The generic instance type is erased here (the domain's materialize function
  * narrows it back to the segment-specific `ProviderInstance<Req, Res>`).
@@ -63,4 +97,6 @@ export interface ProviderInstance<Req, Res> {
 export interface ProviderFactory {
   capabilities: string[];
   create(capability: string, binding: ProviderBinding): ProviderInstance<unknown, unknown>;
+  /** Account fields declared by this provider (drives `web config add`). */
+  config?: ProviderConfigField[];
 }

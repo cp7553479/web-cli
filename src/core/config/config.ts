@@ -28,10 +28,12 @@ export interface LoadedConfig<T> {
 }
 
 /**
- * Generic config loader. Resolves the global + optional project overlay,
- * deep-merges them, parses `.env` files (process.env ⊂ global ⊂ project),
- * resolves `{$ENV_VAR}` whole-field tokens, then hands the result to the
- * domain validator. Core remains fully schema-agnostic.
+ * Generic config loader with fallback order: the project `./<appName>/config.json`
+ * wins when present (a project scope is self-contained); the global config is
+ * the fallback and is auto-created on first run. Then `.env` files are parsed
+ * (process.env ⊂ global ⊂ project), `{$ENV_VAR}` whole-field tokens are
+ * resolved, and the result is handed to the domain validator. Core remains
+ * fully schema-agnostic.
  */
 export function loadAppConfig<T>(options: LoadAppConfigOptions<T>): LoadedConfig<T> {
   const cwd = options.cwd ?? process.cwd();
@@ -54,12 +56,13 @@ export function loadAppConfig<T>(options: LoadAppConfigOptions<T>): LoadedConfig
     }
   }
 
-  const globalRaw = readJson(paths.globalConfig, options.appName);
-  const projectRaw = paths.projectConfig && fs.existsSync(paths.projectConfig)
-    ? readJson(paths.projectConfig, options.appName)
-    : undefined;
-
-  const merged = projectRaw ? deepMerge(globalRaw, projectRaw) : globalRaw;
+  // Project scope wins: `./.web/config.json` is used as-is when present;
+  // otherwise the global `~/.web/config.json` (bootstrapped above) applies.
+  const activeFile =
+    paths.projectConfig !== undefined && fs.existsSync(paths.projectConfig)
+      ? paths.projectConfig
+      : paths.globalConfig;
+  const merged = readJson(activeFile, options.appName);
 
   const envLayer = mergeEnvLayers(env, paths);
   const resolved = resolveEnvTokens(merged, envLayer);
@@ -75,7 +78,7 @@ export function loadCurrentPointer(paths: AppPaths): Record<string, string> {
 /**
  * Returns the layered environment used for `{$VAR}` resolution
  * (`process.env` ← global `.env` ← project `.env`). Diagnostic surfaces
- * (e.g. `config doctor`) must check this, not bare `process.env`.
+ * (e.g. a `doctor` command) must check this, not bare `process.env`.
  */
 export function loadAppEnv(
   paths: AppPaths,
@@ -103,26 +106,6 @@ function readJson(file: string, appName: string): unknown {
       "CONFIG_PARSE_ERROR",
     );
   }
-}
-
-/**
- * Generic deep merge. For keys present in both: if both values are plain
- * objects, recurse (this unions `account` maps with overlay entries winning on
- * alias collision); otherwise the overlay value wins. Arrays replace.
- */
-export function deepMerge(base: unknown, overlay: unknown): unknown {
-  if (isPlainObject(base) && isPlainObject(overlay)) {
-    const out: Record<string, unknown> = { ...base };
-    for (const [key, value] of Object.entries(overlay)) {
-      out[key] = key in out ? deepMerge(out[key], value) : value;
-    }
-    return out;
-  }
-  return overlay;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

@@ -76,11 +76,69 @@ describe("config lifecycle (isolated HOME)", () => {
     const home = freshHome();
     await runWeb(["config", "init"], { HOME: home });
     await runWeb(["config", "set", "fetch", "h", "--provider", "http"], { HOME: home });
-    const doc = await runWeb(["config", "doctor"], { HOME: home });
+    const doc = await runWeb(["doctor"], { HOME: home });
     expect(doc.code).toBe(0);
     expect(doc.stdout).toMatch(/config: ok/);
     expect(doc.stdout).toMatch(/curl: ok/);
     expect(doc.stdout).toContain("factory=ok");
+  });
+
+  it("doctor --fix creates config + .env on a fresh HOME", async () => {
+    const home = freshHome();
+    const fixed = await runWeb(["doctor", "--fix"], { HOME: home });
+    expect(fixed.code).toBe(0);
+    expect(fixed.stdout).toMatch(/fixed: .*config\.json/);
+    expect(fixed.stdout).toMatch(/fixed: .*\.env/);
+    expect(fs.existsSync(path.join(home, ".web", "config.json"))).toBe(true);
+    expect(fs.existsSync(path.join(home, ".web", ".env"))).toBe(true);
+    const after = await runWeb(["doctor"], { HOME: home });
+    expect(after.code).toBe(0);
+    expect(after.stdout).not.toContain("fixed:");
+  });
+
+  it("doctor exits non-zero when an account references an unknown provider", async () => {
+    const home = freshHome();
+    await runWeb(["config", "init"], { HOME: home });
+    await runWeb(["config", "set", "search", "x", "--provider", "nope"], { HOME: home });
+    const doc = await runWeb(["doctor"], { HOME: home });
+    expect(doc.code).toBe(1);
+    expect(doc.stdout).toContain("factory=MISSING");
+  });
+
+  it("doctor --json emits the raw report", async () => {
+    const home = freshHome();
+    await runWeb(["config", "init"], { HOME: home });
+    const doc = await runWeb(["doctor", "--json"], { HOME: home });
+    expect(doc.code).toBe(0);
+    const report = JSON.parse(doc.stdout);
+    expect(report.configOk).toBe(true);
+    expect(report.curlAvailable).toBe(true);
+    expect(Array.isArray(report.accounts)).toBe(true);
+  });
+
+  it("provider list marks providers disabled via config.providers", async () => {
+    const home = freshHome();
+    await runWeb(["config", "init"], { HOME: home });
+    disableProvider(home, "tavily");
+    const list = await runWeb(["provider", "list"], { HOME: home });
+    expect(list.code).toBe(0);
+    expect(list.stdout).toMatch(/tavily.*enabled=false/);
+    expect(list.stdout).not.toMatch(/firecrawl.*enabled=false/);
+  });
+
+  it("accounts of a disabled provider are skipped (doctor warns, search fails fast)", async () => {
+    const home = freshHome();
+    await runWeb(["config", "init"], { HOME: home });
+    await runWeb(["config", "set", "search", "main", "--provider", "tavily", "--token", "tvly-secret"], { HOME: home });
+    disableProvider(home, "tavily");
+
+    const doc = await runWeb(["doctor"], { HOME: home });
+    expect(doc.code).toBe(0);
+    expect(doc.stdout).toContain("enabled=false");
+
+    const search = await runWeb(["search", "q"], { HOME: home });
+    expect(search.code).toBe(1);
+    expect(search.stderr).toMatch(/no accounts configured under \[search/);
   });
 
   it("doctor resolves {$ENV} tokens via ~/.web/.env, not only process.env", async () => {
@@ -93,12 +151,19 @@ describe("config lifecycle (isolated HOME)", () => {
       { HOME: home },
     );
     fs.writeFileSync(path.join(home, ".web", ".env"), "WEB_IT_TOKEN_X9=it-secret\n", "utf8");
-    const doc = await runWeb(["config", "doctor"], { HOME: home });
+    const doc = await runWeb(["doctor"], { HOME: home });
     expect(doc.code).toBe(0);
     expect(doc.stdout).toContain("env=ok");
     expect(doc.stdout).not.toContain("UNRESOLVED");
   });
 });
+
+function disableProvider(home: string, providerId: string): void {
+  const cfgPath = path.join(home, ".web", "config.json");
+  const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  cfg.providers = { [providerId]: { enabled: false } };
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
+}
 
 describe("provider list", () => {
   it("lists built-in providers with capabilities", async () => {

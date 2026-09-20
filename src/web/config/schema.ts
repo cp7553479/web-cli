@@ -1,12 +1,20 @@
 import { AppError } from "../../core/errors";
 import type { ConfigValidator } from "../../core/config/validator";
-import { SEGMENTS, type AccountConfig, type SegmentConfig, type WebConfig } from "./types";
+import {
+  SEGMENTS,
+  type AccountConfig,
+  type ProviderConfig,
+  type RuntimeConfig,
+  type SegmentConfig,
+  type SegmentProviders,
+  type WebConfig,
+} from "./types";
 
 /**
  * Hand-written structural validator (no schema library). Checks the merged raw
  * config for shape errors with concise, path-aware messages. Provider-name
  * existence is NOT checked here — that happens at materialize time so unknown
- * providers can be reported by `web config doctor` rather than blocking load.
+ * providers can be reported by `web doctor` rather than blocking load.
  */
 export const webConfigValidator: ConfigValidator<WebConfig> = {
   validate(raw) {
@@ -16,25 +24,65 @@ export const webConfigValidator: ConfigValidator<WebConfig> = {
     const root = raw as Record<string, unknown>;
     const out: WebConfig = {
       runtime: validateRuntime(root.runtime),
+      providers: validateProviders(root.providers),
       search: validateSegment(root.search, "search"),
       fetch: validateSegment(root.fetch, "fetch"),
     };
+    if (root.images !== undefined && root.images !== null) {
+      out.images = validateSegment(root.images, "images");
+    }
+    if (root.ask !== undefined && root.ask !== null) {
+      out.ask = validateSegment(root.ask, "ask");
+    }
     return out;
   },
 };
 
-function validateRuntime(value: unknown): { logging?: boolean } | undefined {
+function validateProviders(value: unknown): Record<string, ProviderConfig> | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!isObject(value)) {
+    throw new AppError("providers must be an object.", "CONFIG_SCHEMA_ERROR");
+  }
+  const out: Record<string, ProviderConfig> = {};
+  for (const [name, entry] of Object.entries(value)) {
+    if (!name) {
+      throw new AppError("providers has an empty provider name.", "CONFIG_SCHEMA_ERROR");
+    }
+    if (!isObject(entry)) {
+      throw new AppError(`[providers.${name}] must be an object.`, "CONFIG_SCHEMA_ERROR");
+    }
+    if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
+      throw new AppError(`[providers.${name}].enabled must be a boolean.`, "CONFIG_SCHEMA_ERROR");
+    }
+    out[name] = { enabled: entry.enabled as boolean | undefined };
+  }
+  return out;
+}
+
+function validateRuntime(value: unknown): RuntimeConfig | undefined {
   if (value === undefined || value === null) return undefined;
   if (!isObject(value)) {
     throw new AppError("runtime must be an object.", "CONFIG_SCHEMA_ERROR");
   }
   const runtime = value as Record<string, unknown>;
-  const out: { logging?: boolean } = {};
+  const out: RuntimeConfig = {};
   if (runtime.logging !== undefined) {
     if (typeof runtime.logging !== "boolean") {
       throw new AppError("runtime.logging must be a boolean.", "CONFIG_SCHEMA_ERROR");
     }
     out.logging = runtime.logging;
+  }
+  if (runtime.lock_ttl_ms !== undefined) {
+    if (typeof runtime.lock_ttl_ms !== "number" || !Number.isInteger(runtime.lock_ttl_ms) || runtime.lock_ttl_ms <= 0) {
+      throw new AppError("runtime.lock_ttl_ms must be a positive integer (ms).", "CONFIG_SCHEMA_ERROR");
+    }
+    out.lock_ttl_ms = runtime.lock_ttl_ms;
+  }
+  if (runtime.retry_rounds !== undefined) {
+    if (typeof runtime.retry_rounds !== "number" || !Number.isInteger(runtime.retry_rounds) || runtime.retry_rounds <= 0) {
+      throw new AppError("runtime.retry_rounds must be a positive integer.", "CONFIG_SCHEMA_ERROR");
+    }
+    out.retry_rounds = runtime.retry_rounds;
   }
   return out;
 }
@@ -56,8 +104,30 @@ function validateSegment(value: unknown, segment: string): SegmentConfig {
   return {
     inject_before: seg.inject_before as string | undefined,
     inject_after: seg.inject_after as string | undefined,
+    providers: validateSegmentProviders(seg.providers, segment),
     account: validateAccounts(seg.account, segment),
   };
+}
+
+function validateSegmentProviders(value: unknown, segment: string): SegmentProviders | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!isObject(value)) {
+    throw new AppError(`[${segment}].providers must be an object.`, "CONFIG_SCHEMA_ERROR");
+  }
+  const out: SegmentProviders = {};
+  if (value.primary !== undefined) {
+    if (typeof value.primary !== "string" || !value.primary) {
+      throw new AppError(`[${segment}].providers.primary must be a non-empty provider id.`, "CONFIG_SCHEMA_ERROR");
+    }
+    out.primary = value.primary;
+  }
+  if (value.list !== undefined) {
+    if (!Array.isArray(value.list) || value.list.some((id) => typeof id !== "string" || !id)) {
+      throw new AppError(`[${segment}].providers.list must be an array of provider ids.`, "CONFIG_SCHEMA_ERROR");
+    }
+    out.list = value.list;
+  }
+  return out;
 }
 
 function validateAccounts(value: unknown, segment: string): Record<string, AccountConfig> {
@@ -93,12 +163,19 @@ function validateAccount(value: unknown, segment: string, alias: string): Accoun
   if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
     throw new AppError(`[${segment}.account.${alias}].enabled must be a boolean.`, "CONFIG_SCHEMA_ERROR");
   }
-  return {
+  const out: AccountConfig = {
     provider: entry.provider,
     api_token: entry.api_token as string | undefined,
     base_url: entry.base_url as string | undefined,
     enabled: entry.enabled as boolean | undefined,
   };
+  // Provider schema fields pass through verbatim (flat string values) — they
+  // are handed to the factory binding at materialize time.
+  for (const [key, field] of Object.entries(entry)) {
+    if (key in out) continue;
+    if (typeof field === "string") out[key] = field;
+  }
+  return out;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

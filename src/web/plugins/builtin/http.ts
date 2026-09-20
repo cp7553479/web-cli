@@ -1,6 +1,6 @@
-import type { ProviderBinding, ProviderHooks, TransportRequest } from "../../core";
-import type { FetchRequest, ProviderResponse } from "../protocol/types";
-import { makeInstance } from "./_factory";
+import type { PluginHost, ProviderBinding, ProviderHooks, TransportRequest } from "../../../core";
+import type { FetchRequest, ProviderResponse } from "../../protocol/types";
+import { makeFactory, makeInstance } from "./factory";
 
 /**
  * Raw HTTP fetch: a plain `curl GET` of the target URL, body returned as-is.
@@ -32,4 +32,8 @@ export function createHttpFetch(binding: ProviderBinding) {
 function extractTitle(html: string): string | undefined {
   const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   return match ? match[1].trim() : undefined;
+}
+
+export function activate(host: PluginHost): void {
+  host.registerFactory("http", makeFactory(["fetch"], { fetch: createHttpFetch }));
 }

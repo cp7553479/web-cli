@@ -6,14 +6,27 @@
  */
 export const DEFAULT_CONFIG_JSON = `{
   "runtime": {
-    "logging": true
+    "logging": true,
+    "lock_ttl_ms": 900000,
+    "retry_rounds": 1
   },
+  "providers": {},
   "search": {
     "inject_before": "",
     "inject_after": "",
     "account": {}
   },
   "fetch": {
+    "inject_before": "",
+    "inject_after": "",
+    "account": {}
+  },
+  "images": {
+    "inject_before": "",
+    "inject_after": "",
+    "account": {}
+  },
+  "ask": {
     "inject_before": "",
     "inject_after": "",
     "account": {}

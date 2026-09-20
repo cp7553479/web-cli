@@ -11,7 +11,7 @@
 - 只接官方 API 或官方公开端点
 - 优先 HTTP 直连，不依赖官方 SDK
 - 配置统一在 `~/.web`，一次配置，多端复用
-- 模块化：命令层、编排层、provider 层、配置层清晰分离
+- 模块化：命令层、可移植核心、provider 插件、配置层清晰分离
 
 ## 我们明确不做什么
 
@@ -23,18 +23,19 @@
 
 ## 对后续开发者的约定
 
-- **Agent 技能文以 `init/skills/web-cli/` 为发布源**；`web onboard init` / 向导落盘时会同步到 `~/.web/skills` 及用户机器上已存在的各 Agent `skills` 目录（如 `~/.claude/skills`）。仓库内 `.claude/skills/web-cli` 与 `init/skills/web-cli` 应保持内容一致。
-- 新增 provider 时，同步更新：
-  - `docs/provider-curl-mapping.md`
-  - `init/skills/web-cli/` 与 `.claude/skills/web-cli/` 下对应文档
-- 修改命令参数时，同步更新 `README.md`、`README_CN.md` 与 skill 示例
+- **Agent 技能文以 `init/skills/web-cli/` 为发布源**；首次运行或
+  `web config init` 安装到 `~/.web/skills`、`~/.agents/skills` 及各 Hermes
+  profile 的 `skills/`。仓库内 `.claude/skills/web-cli` 是指向发布源的符号
+  链接。
+- 新增 provider 时，同步更新 `docs/provider-apis.md` 与 `init/skills/web-cli/`
+  下对应文档
+- 修改命令参数时，同步更新 `SPEC.md`、`README.md`、`README_CN.md` 与 skill 示例
 - 任何改动都要保证：
   - `npm run build`
   - `npm test`
 
 ## 长期方向
 
-- 插件化的Provider，通过协议层兼容进指令调用
 - 可扩展性的指令 web search/fetch/ask/research 以及更多...
 - 颗粒度更细的可控参数
 - 保证新用户可读性和使用友好

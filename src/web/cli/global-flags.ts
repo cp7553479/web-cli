@@ -21,13 +21,13 @@ function positiveInt(raw: unknown, fallback: number, name: string): number {
 
 /** Parses the program-level global options into a validated {@link GlobalFlags}. */
 export function toGlobalFlags(options: Record<string, unknown>): GlobalFlags {
-  const rawFormat = (options.format as string) ?? "text";
+  const rawFormat = (options.format as string) ?? "markdown";
   if (!VALID_FORMATS.includes(rawFormat as OutputFormat)) {
     throw new AppError(`Invalid format '${rawFormat}'. Supported: ${VALID_FORMATS.join(", ")}`, "INVALID_PARAM");
   }
   return {
     format: rawFormat as OutputFormat,
-    maxLength: positiveInt(options.maxLength, 10000, "--max-length"),
-    timeoutMs: positiveInt(options.timeoutMs, 15000, "--timeout-ms"),
+    maxLength: positiveInt(options.maxLength, 50_000, "--max-length"),
+    timeoutMs: positiveInt(options.timeoutMs, 30_000, "--timeout-ms"),
   };
 }

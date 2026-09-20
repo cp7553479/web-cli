@@ -1,8 +1,8 @@
-import type { ProviderBinding, ProviderHooks, TransportRequest } from "../../core";
-import type { ProviderResponse, SearchRequest } from "../protocol/types";
-import { filterVendorParams } from "../protocol/vendor-params";
-import { ensureSuccess, parseJsonBody, resolveBaseUrl, toQuery } from "./_http";
-import { makeInstance } from "./_factory";
+import type { PluginHost, ProviderBinding, ProviderHooks, TransportRequest } from "../../../core";
+import type { ProviderResponse, SearchRequest } from "../../protocol/types";
+import { filterVendorParams } from "../../protocol/vendor-params";
+import { ensureSuccess, parseJsonBody, resolveBaseUrl, toQuery } from "./shared";
+import { makeFactory, makeInstance } from "./factory";
 
 const DEFAULT_BASE = "https://api.search.brave.com";
 const SEARCH_VENDOR_ALLOWLIST = [
@@ -66,4 +66,8 @@ export function createBraveSearch(binding: ProviderBinding) {
     },
   };
   return makeInstance(binding, hooks);
+}
+
+export function activate(host: PluginHost): void {
+  host.registerFactory("brave", makeFactory(["search"], { search: createBraveSearch }));
 }

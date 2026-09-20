@@ -21,6 +21,19 @@ export interface FetchRequest {
   vendorParams?: Record<string, unknown>;
 }
 
+export interface ImageSearchRequest {
+  query: string;
+  limit: number;
+  vendorParams?: Record<string, unknown>;
+}
+
+export interface AskRequest {
+  question: string;
+  /** liteLLM-style model id (e.g. "gpt-5.1-mini"); provider part of --model routes the pool. */
+  model?: string;
+  vendorParams?: Record<string, unknown>;
+}
+
 export interface ResultItem {
   title?: string;
   url?: string;
@@ -38,4 +51,4 @@ export interface ProviderResponse {
   raw?: unknown;
 }
 
-export type SegmentName = "search" | "fetch";
+export type SegmentName = "search" | "fetch" | "images" | "ask";

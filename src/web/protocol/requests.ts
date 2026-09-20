@@ -1,5 +1,5 @@
 import { AppError } from "../../core/errors";
-import type { SearchRequest, FetchRequest } from "./types";
+import type { SearchRequest, FetchRequest, ImageSearchRequest, AskRequest } from "./types";
 
 export const FRESHNESS_VALUES = ["day", "week", "month", "year"] as const;
 export const WAIT_UNTIL_VALUES = ["load", "domcontentloaded", "networkidle"] as const;
@@ -86,6 +86,40 @@ export function buildFetchRequest(input: BuildFetchRequestInput): FetchRequest {
     urls: input.urls,
     selector: input.selector,
     waitUntil,
+    vendorParams,
+  };
+}
+
+/** Builds and validates an {@link ImageSearchRequest} from CLI-shaped input. */
+export function buildImageSearchRequest(input: {
+  query: string;
+  limit: number;
+  vendorParams?: Record<string, unknown>;
+}): ImageSearchRequest {
+  if (!input.query?.trim()) {
+    throw new AppError("Query is required for search-image.", "INVALID_PARAM");
+  }
+  const vendorParams = Object.keys(input.vendorParams ?? {}).length ? input.vendorParams : undefined;
+  return {
+    query: input.query.trim(),
+    limit: requirePositiveInt(input.limit, "--limit", 10),
+    vendorParams,
+  };
+}
+
+/** Builds and validates an {@link AskRequest} from CLI-shaped input. */
+export function buildAskRequest(input: {
+  question: string;
+  model?: string;
+  vendorParams?: Record<string, unknown>;
+}): AskRequest {
+  if (!input.question?.trim()) {
+    throw new AppError("Question is required for ask.", "INVALID_PARAM");
+  }
+  const vendorParams = Object.keys(input.vendorParams ?? {}).length ? input.vendorParams : undefined;
+  return {
+    question: input.question.trim(),
+    model: input.model,
     vendorParams,
   };
 }

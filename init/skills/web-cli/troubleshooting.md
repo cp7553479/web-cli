@@ -3,7 +3,7 @@
 ## 1) 项目 `./.web` 与全局冲突
 
 1. `web config path` 查看生效的 globalConfig / projectRoot / logsDir
-2. 项目目录下 `./.web/config.json` 会 **deep-merge 覆写** `~/.web/config.json`；`./.web/.env` 同理覆盖 `~/.web/.env`
+2. 项目目录下 `./.web/config.json` 存在时**整体生效（项目作用域优先）**，不再合并 `~/.web/config.json`；`./.web/.env` 同理优先于 `~/.web/.env`
 3. 查看 **`./.web/logs/`**（存在项目配置时）或 `~/.web/logs/` 中本次命令的请求/响应
 
 ## 2) `Environment variable 'XXX' is not set`（`ENV_TOKEN_NOT_FOUND`）
@@ -32,6 +32,7 @@
 
 1. 错误输出的 `attempts[]` 里有每个账号的 classification 与原始报错，逐个排查
 2. 常见组合：key 全失效 / 全部欠费 / 网络不通
+3. 失败的账号会自动冷却 15 分钟（`locks.json`），冷却期内被跳过；排查后无需手动清除，到期自动恢复
 
 ## 7) 超时或网络失败
 
@@ -41,7 +42,7 @@
 ## 8) fetch 结果为空或异常
 
 1. 静态页：换 `provider = "http"`（原始 HTML）或 `html2markdown`（本地转 Markdown）账号
-2. 动态页：`provider = "playwright"` 账号 + `--wait-until networkidle`
+2. 动态页：不配置账号也会自动用 playwright 浏览器兜底；需要固定账号时 `provider = "playwright"`（可配 `headless: "false"`）+ `--wait-until networkidle`
 3. `--selector` 缩小 DOM 范围
 
 ## 9) fetch 输出被落盘

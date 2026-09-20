@@ -1,8 +1,8 @@
-import type { ProviderBinding, ProviderHooks, TransportRequest } from "../../core";
-import type { FetchRequest, ProviderResponse, SearchRequest } from "../protocol/types";
-import { filterVendorParams } from "../protocol/vendor-params";
-import { bearer, ensureSuccess, parseJsonBody, resolveBaseUrl } from "./_http";
-import { makeInstance } from "./_factory";
+import type { PluginHost, ProviderBinding, ProviderHooks, TransportRequest } from "../../../core";
+import type { FetchRequest, ProviderResponse, SearchRequest } from "../../protocol/types";
+import { filterVendorParams } from "../../protocol/vendor-params";
+import { bearer, ensureSuccess, parseJsonBody, resolveBaseUrl } from "./shared";
+import { makeFactory, makeInstance } from "./factory";
 
 const DEFAULT_BASE = "https://api.tavily.com";
 const SEARCH_VENDOR_ALLOWLIST = [
@@ -115,4 +115,11 @@ export function createTavilyFetch(binding: ProviderBinding) {
     },
   };
   return makeInstance(binding, hooks);
+}
+
+export function activate(host: PluginHost): void {
+  host.registerFactory("tavily", makeFactory(["search", "fetch"], {
+    search: createTavilySearch,
+    fetch: createTavilyFetch,
+  }));
 }

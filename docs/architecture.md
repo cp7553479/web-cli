@@ -14,13 +14,14 @@ structured in code.
 ┌──────────────────────────────────────────────────────────────┐
 │ DOMAIN  src/web/   (web-cli specific; depends on core)       │
 │                                                              │
-│  cli/commands/{search,fetch,config,provider}.ts              │
-│  protocol/{types,requests}.ts   SearchRequest/FetchRequest   │
+│  cli/commands/{search,fetch,search-image,ask,config,         │
+│                  provider,doctor,update}.ts                   │
+│  protocol/{types,requests}.ts   Search/Fetch/Image/Ask reqs  │
 │  config/{schema,defaults,materialize}.ts                     │
-│  providers/{brave,tavily,jina,firecrawl,perplexity,          │
-│             http,html2markdown,playwright}.ts                │
-│  output/render.ts            item → json/markdown/text       │
-│  plugins/external.ts         ~/.web/plugins loader            │
+│  plugins/builtin/   search/fetch/image/ask providers         │
+│                     (brave…playwright, chatgpt…zhipu)        │
+│  output/{render,emit}.ts     item → json/markdown/text; spill │
+│  plugins/index.ts            loadPlugins (builtin + external) │
 └──────────────────────────────┬───────────────────────────────┘
                                │ imports (one-way)
                                ▼
@@ -53,7 +54,7 @@ commander parses → search command action
    │
    ▼  context.ts builds:
       config  = loadWebConfig()                  // core loader + domain schema
-      pools   = materializePools(config)         // 2 typed pools: search, fetch
+      pools   = materializeRegistries(config)     // 4 typed pools:
       logger  = new FileLogger()
    │
    ▼  searchPool.run(request, { forcedAccount, forcedProvider })
@@ -203,11 +204,12 @@ function getAppPaths(appName: string, cwd?: string): {
   projectCurrent?: string;
   projectEnv?: string;
   logsDir: string;          // project .web/logs if project exists else ~/.web/logs
+  lockFile: string;         // <active-.web>/locks.json (account cooldowns)
 };
 ```
 
-Core provides the **mechanism** (read, deep-merge per known segment keys,
-resolve `{$ENV}`, validate via injected validator). The **schema** is domain-
+Core provides the **mechanism** (project-first fallback read, `{$ENV}`
+resolution, validation via injected validator). The **schema** is domain-
 supplied, so core ships no knowledge of `search`/`fetch`.
 
 ### 3.5 CLI / output / logger — small and generic
@@ -222,9 +224,6 @@ supplied, so core ships no knowledge of `search`/`fetch`.
 
 ## 4. Why this split
 
-- **Portability:** `src/core/` can be copied into image-cli (or any future
-  "N providers + pool + curl" CLI) unchanged. It depends on nothing web-
-  specific.
 - **Clarity:** the protocol layer is the single place that owns request
   dispatch, failure taxonomy, and pool-pointer movement. Providers are dumb
   hook bundles; commands are thin adapters.

@@ -1,9 +1,10 @@
 import type {
   AccountCredentials,
   ProviderBinding,
+  ProviderFactory,
   ProviderHooks,
   ProviderInstance,
-} from "../../core";
+} from "../../../core";
 
 /**
  * Builds a typed {@link ProviderInstance} from a binding + hooks. The returned
@@ -24,5 +25,26 @@ export function makeInstance<Req, Res>(
     providerName: binding.providerName,
     account,
     hooks: hooks as unknown as ProviderHooks<unknown, unknown>,
+  };
+}
+
+/**
+ * Builds a {@link ProviderFactory} from per-segment instance builders. Each
+ * factory declares which capability segments it can build and dispatches
+ * `create(capability, binding)` to the segment-specific builder.
+ */
+export function makeFactory(
+  capabilities: string[],
+  builders: Record<string, (binding: ProviderBinding) => ProviderInstance<unknown, unknown>>,
+): ProviderFactory {
+  return {
+    capabilities,
+    create(capability, binding) {
+      const builder = builders[capability];
+      if (!builder) {
+        throw new Error(`Provider does not implement capability '${capability}'.`);
+      }
+      return builder(binding);
+    },
   };
 }

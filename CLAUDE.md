@@ -15,11 +15,11 @@
 
 ## 代码与架构边界
 
-- 命令层：`src/cli/commands/*`
-- 编排层：`src/core/orchestrator.ts`
-- Provider 层：`src/providers/*`
-- 配置层：`src/config/*`
-- 输出层：`src/output/*`
+- 命令层：`src/web/cli/commands/*`
+- 可移植核心：`src/core/`（池编排 / curl 传输 / 配置加载 / 日志）
+- Provider 插件：内置 `src/web/plugins/builtin/*`，外置 `~/.web/plugins/<id>/`
+- 配置层：`src/web/config/*`
+- 输出层：`src/web/output/*`
 
 不要把 provider 细节泄漏到命令层，不要在 CLI 命令里直接拼接第三方 API 逻辑。
 
@@ -51,8 +51,8 @@ npm test
 
 - `README.md`（英文默认）
 - `README_CN.md`（中文）
-- `docs/provider-curl-mapping.md`
-- `docs/onboard.md`
+- `SPEC.md`
+- `docs/provider-apis.md`
 - `docs/plugin-protocol.md`
 - `init/skills/web-cli/SKILL.md`
 - `init/skills/web-cli/examples.md`

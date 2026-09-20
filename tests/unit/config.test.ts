@@ -4,31 +4,10 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { deepMerge, resolveEnvTokens } from "../../src/core/config/config";
+import { resolveEnvTokens } from "../../src/core/config/config";
 import { getAppPaths } from "../../src/core/config/paths";
 import { webConfigValidator } from "../../src/web/config/schema";
 import { loadWebConfig } from "../../src/web/config";
-
-describe("deepMerge", () => {
-  it("unions nested account maps with overlay winning on alias collision", () => {
-    const base = {
-      search: { account: { a: { provider: "brave" }, b: { provider: "tavily" } } },
-    };
-    const overlay = {
-      search: { account: { b: { provider: "jina" }, c: { provider: "http" } } },
-    };
-    const out = deepMerge(base, overlay) as {
-      search: { account: Record<string, { provider: string }> };
-    };
-    expect(Object.keys(out.search.account).sort()).toEqual(["a", "b", "c"]);
-    expect(out.search.account.b.provider).toBe("jina");
-  });
-
-  it("overlay scalars win; arrays replace", () => {
-    expect(deepMerge({ a: 1, b: 2 }, { a: 9 })).toEqual({ a: 9, b: 2 });
-    expect(deepMerge({ a: [1, 2] }, { a: [3] })).toEqual({ a: [3] });
-  });
-});
 
 describe("resolveEnvTokens", () => {
   it("substitutes whole-field {$VAR} tokens", () => {
@@ -84,6 +63,47 @@ describe("webConfigValidator", () => {
       webConfigValidator.validate({ search: { account: { a: { provider: "x", enabled: "yes" } } } }),
     ).toThrow(/enabled must be a boolean/);
   });
+
+  it("validates segment providers primary/list", () => {
+    const out = webConfigValidator.validate({
+      search: { providers: { primary: "tavily", list: ["brave", "perplexity"] }, account: {} },
+    });
+    expect(out.search.providers?.primary).toBe("tavily");
+    expect(out.search.providers?.list).toEqual(["brave", "perplexity"]);
+    expect(() =>
+      webConfigValidator.validate({ search: { providers: { primary: "" } } }),
+    ).toThrow(/providers\.primary/);
+    expect(() =>
+      webConfigValidator.validate({ search: { providers: { list: ["ok", 3] } } }),
+    ).toThrow(/providers\.list/);
+    expect(() =>
+      webConfigValidator.validate({ search: { providers: "tavily" } }),
+    ).toThrow(/providers must be an object/);
+  });
+
+  it("validates runtime.lock_ttl_ms and runtime.retry_rounds", () => {
+    const out = webConfigValidator.validate({ runtime: { lock_ttl_ms: 60_000, retry_rounds: 2 } });
+    expect(out.runtime?.lock_ttl_ms).toBe(60_000);
+    expect(out.runtime?.retry_rounds).toBe(2);
+    expect(() => webConfigValidator.validate({ runtime: { lock_ttl_ms: -1 } })).toThrow(/lock_ttl_ms/);
+    expect(() => webConfigValidator.validate({ runtime: { retry_rounds: 0 } })).toThrow(/retry_rounds/);
+  });
+
+  it("validates the providers map", () => {
+    const out = webConfigValidator.validate({ providers: { tavily: { enabled: false } } });
+    expect(out.providers?.tavily?.enabled).toBe(false);
+    expect(webConfigValidator.validate({}).providers).toBeUndefined();
+  });
+
+  it("rejects malformed providers entries", () => {
+    expect(() => webConfigValidator.validate({ providers: [] })).toThrow(/providers must be an object/);
+    expect(() => webConfigValidator.validate({ providers: { tavily: { enabled: "no" } } })).toThrow(
+      /\[providers\.tavily\]\.enabled must be a boolean/,
+    );
+    expect(() => webConfigValidator.validate({ providers: { tavily: true } })).toThrow(
+      /\[providers\.tavily\] must be an object/,
+    );
+  });
 });
 
 describe("loadWebConfig end-to-end", () => {
@@ -112,7 +132,7 @@ describe("loadWebConfig end-to-end", () => {
     expect(config.fetch.account).toEqual({});
   });
 
-  it("merges project overlay onto global and resolves {$ENV} tokens", () => {
+  it("uses the project config exclusively when ./.web/config.json exists (fallback order)", () => {
     const { home, cwd } = withTmpHome();
     const globalRoot = path.join(home, ".web");
     fs.mkdirSync(globalRoot, { recursive: true });
@@ -129,7 +149,19 @@ describe("loadWebConfig end-to-end", () => {
     fs.writeFileSync(path.join(projectRoot, ".env"), "TKEY=secret123\n");
 
     const { config } = loadWebConfig(cwd);
-    expect(Object.keys(config.search.account).sort()).toEqual(["a", "b"]);
+    expect(Object.keys(config.search.account)).toEqual(["b"]);
     expect(config.search.account.b.api_token).toBe("secret123");
+  });
+
+  it("falls back to the global config without a project", () => {
+    const { home, cwd } = withTmpHome();
+    const globalRoot = path.join(home, ".web");
+    fs.mkdirSync(globalRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(globalRoot, "config.json"),
+      JSON.stringify({ search: { account: { a: { provider: "brave" } } } }),
+    );
+    const { config } = loadWebConfig(cwd);
+    expect(Object.keys(config.search.account)).toEqual(["a"]);
   });
 });

@@ -12,7 +12,7 @@ import {
 describe("toGlobalFlags", () => {
   it("applies defaults", () => {
     const f = toGlobalFlags({});
-    expect(f).toEqual({ format: "text", maxLength: 10000, timeoutMs: 15000 });
+    expect(f).toEqual({ format: "markdown", maxLength: 50_000, timeoutMs: 30_000 });
   });
 
   it("rejects invalid format", () => {

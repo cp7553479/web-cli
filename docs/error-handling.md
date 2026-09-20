@@ -32,11 +32,17 @@ provider failure is mapped to a `FailureClass` for **diagnostics only**
 | `unsupported` | provider cannot serve this request shape |
 | `unknown` | unclassified |
 
-**Rotation rule (single, simple):** on any failure, advance to the next
-configured account. The class is recorded but does not gate rotation. We do not
-short-circuit on `non-retryable-request` because HTTP status is unreliable —
-Brave returns 422 for invalid-token auth errors, which are account-specific and
-must rotate.
+**Rotation rule (single, simple):** on any failure, record the class, **lock
+the account for 15 minutes** (persisted to `<active-.web>/locks.json`;
+`runtime.lock_ttl_ms` overrides the default) and advance to the next
+configured account. Locked accounts are skipped on later runs; when every
+account is locked they are retried earliest-locked-first. The queue is walked
+`runtime.retry_rounds` times (default 1 — each account is tried at most once
+per invocation, so the loop always terminates). Forced
+`--provider`/`--account` runs bypass the lock file. The class is recorded but
+does not gate rotation. We do not short-circuit on `non-retryable-request`
+because HTTP status is unreliable — Brave returns 422 for invalid-token auth
+errors, which are account-specific and must rotate.
 
 Precedence for assigning the class (see `classifyFailure` in `pool.ts`):
 
@@ -45,7 +51,7 @@ Precedence for assigning the class (see `classifyFailure` in `pool.ts`):
 3. core transport error (`code` starts with `TRANSPORT_`) → `retryable-transport`.
 4. otherwise → `unknown`.
 
-`ensureSuccess` (in `src/web/providers/_http.ts`) inspects `result.statusCode`
+`ensureSuccess` (in `src/web/plugins/builtin/shared.ts`) inspects `result.statusCode`
 and throws `new ProviderError(classifyHttpStatus(statusCode), msg)` for ≥400.
 The message carries the **raw response body excerpt verbatim** — every
 provider's error envelope is shaped differently, and the raw body is the most
@@ -60,5 +66,8 @@ masked auth headers; responses log status + length. Secrets never reach logs.
 
 ## Self-check
 
-`web config doctor` reports: config parses, curl on PATH, every account's
-provider has a registered factory, `{$ENV}` references resolve.
+`web doctor` reports: config parses, curl on PATH, every account's
+provider has a registered factory, `{$ENV}` references resolve, and the
+`providers.primary`/`list` fallback order (warn on unknown ids). `--fix`
+creates missing `config.json` / `.env` and resets a corrupt `current.json`;
+it exits non-zero on hard failures (config, curl, unknown provider).

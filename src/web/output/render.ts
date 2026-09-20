@@ -1,17 +1,44 @@
-import { injectWrap, stringifyJson, truncate } from "../../core";
+import { injectWrap, stringifyJson } from "../../core";
 import type { ProviderResponse } from "../protocol/types";
 import type { OutputFormat } from "../cli/global-flags";
 
 /**
- * Renders a {@link ProviderResponse} in the requested format, wraps it with the
- * segment's `inject_before`/`inject_after`, and hard-truncates to `maxLength`.
- * Uses core output primitives; the per-item mapping is the only web-specific
- * part (json/markdown/text layouts of `{title,url,snippet,content}`).
+ * Renders an image-search {@link ProviderResponse}. Items carry the image URL
+ * in `url`; markdown emits `![](url)` embeds, text emits plain URL lines.
+ */
+export function renderImages(
+  response: ProviderResponse,
+  format: OutputFormat,
+  injectBefore?: string,
+  injectAfter?: string,
+): string {
+  const body = format === "json"
+    ? stringifyJson({ items: response.items })
+    : format === "markdown"
+      ? response.items.map((item) => {
+          const alt = item.title ?? item.url ?? "image";
+          const lines = [`![${alt}](${item.url ?? ""})`];
+          if (item.snippet) lines.push(`- ${item.snippet}${item.content ? ` — ${item.content}` : ""}`);
+          return lines.join("\n");
+        }).join("\n\n")
+      : response.items.map((item, idx) => {
+          const lines = [`[${idx + 1}] ${item.title ?? "(no title)"}`];
+          if (item.url) lines.push(`url: ${item.url}`);
+          if (item.snippet) lines.push(`source: ${item.snippet}`);
+          return lines.join("\n");
+        }).join("\n\n");
+  return injectWrap(body, injectBefore, injectAfter);
+}
+
+/**
+ * Renders a {@link ProviderResponse} in the requested format, wrapped with the
+ * segment's `inject_before`/`inject_after`. Returns the FULL output — callers
+ * decide truncation/spill (see `emitResult`). The per-item mapping is the only
+ * web-specific part (json/markdown/text layouts of `{title,url,snippet,content}`).
  */
 export function render(
   response: ProviderResponse,
   format: OutputFormat,
-  maxLength: number,
   injectBefore?: string,
   injectAfter?: string,
 ): string {
@@ -20,7 +47,7 @@ export function render(
     : format === "markdown"
       ? renderMarkdown(response)
       : renderText(response);
-  return truncate(injectWrap(body, injectBefore, injectAfter), maxLength);
+  return injectWrap(body, injectBefore, injectAfter);
 }
 
 function renderJson(response: ProviderResponse): string {

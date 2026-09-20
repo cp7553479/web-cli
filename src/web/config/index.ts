@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 
 import {
   AppError,
@@ -8,23 +9,48 @@ import {
   type AppPaths,
   type LoadedConfig,
 } from "../../core";
-import { DEFAULT_CONFIG_JSON } from "./defaults";
+import { DEFAULT_CONFIG_JSON, DEFAULT_ENV_EXAMPLE } from "./defaults";
+import { installSkills } from "./skills";
 import { webConfigValidator } from "./schema";
-import { SEGMENTS, type AccountConfig, type SegmentName, type WebConfig } from "./types";
+import { SEGMENTS, type AccountConfig, type SegmentConfig, type SegmentName, type WebConfig } from "./types";
 
 export { webConfigValidator } from "./schema";
 export { DEFAULT_CONFIG_JSON, DEFAULT_ENV_EXAMPLE } from "./defaults";
+export { installSkills, getSkillInstallDirs, type SkillInstallResult } from "./skills";
 export { materializeRegistries, type MaterializedPools, type SkippedAccount } from "./materialize";
-export type { WebConfig, SegmentConfig, AccountConfig, RuntimeConfig, SegmentName } from "./types";
+export type { WebConfig, SegmentConfig, SegmentProviders, AccountConfig, RuntimeConfig, SegmentName } from "./types";
 export { SEGMENTS } from "./types";
 
 export const APP_NAME = ".web";
 
 /**
- * Loads the merged + env-resolved runtime config (global ⊕ project overlay).
- * Auto-creates the default config on first run. Use this for command execution.
+ * First-run bootstrap: writes the default global config + .env and installs
+ * the bundled agent skills. Idempotent — only fills what is missing. Returns
+ * true when this call created the global config (i.e. this WAS the first run).
+ */
+export function ensureBootstrapped(paths: AppPaths): boolean {
+  if (fs.existsSync(paths.globalConfig)) return false;
+  fs.mkdirSync(paths.globalRoot, { recursive: true });
+  fs.writeFileSync(paths.globalConfig, DEFAULT_CONFIG_JSON, "utf8");
+  if (!fs.existsSync(paths.globalEnv)) {
+    fs.writeFileSync(paths.globalEnv, DEFAULT_ENV_EXAMPLE, "utf8");
+  }
+  const skills = installSkills();
+  const targets = [...new Set(skills.created.map((p) => path.dirname(p)))];
+  if (targets.length) {
+    process.stderr.write(`web: initialized ${paths.globalRoot} (skills -> ${targets.join(", ")})\n`);
+  }
+  return true;
+}
+
+/**
+ * Loads the merged + env-resolved runtime config (project scope when present,
+ * otherwise global). Auto-initializes `~/.web` (config + .env + skills) on
+ * first run. Use this for command execution.
  */
 export function loadWebConfig(cwd: string = process.cwd()): LoadedConfig<WebConfig> {
+  const paths = getAppPaths(APP_NAME, cwd);
+  ensureBootstrapped(paths);
   return loadAppConfig({
     appName: APP_NAME,
     validator: webConfigValidator,
@@ -34,38 +60,40 @@ export function loadWebConfig(cwd: string = process.cwd()): LoadedConfig<WebConf
 }
 
 /**
- * Loads the GLOBAL config only (no project overlay, no `{$ENV}` resolution) for
- * editing/diagnostic surfaces (`config set`, `config show`, `config doctor`).
- * Tokens stay as literal `{$VAR}` strings.
+ * Loads the ACTIVE config (project `./.web/config.json` when present, else
+ * global `~/.web/config.json`) without `{$ENV}` resolution, for
+ * editing/diagnostic surfaces (`config set`, `config show`, `web doctor`).
+ * Tokens stay as literal `{$VAR}` strings. Auto-initializes on first run.
  */
-export function loadGlobalWebConfigRaw(): { config: WebConfig; paths: AppPaths } {
-  const paths = getAppPaths(APP_NAME);
-  fs.mkdirSync(paths.globalRoot, { recursive: true });
-  if (!fs.existsSync(paths.globalConfig)) {
-    fs.writeFileSync(paths.globalConfig, DEFAULT_CONFIG_JSON, "utf8");
-    if (!fs.existsSync(paths.globalEnv)) {
-      fs.writeFileSync(paths.globalEnv, "# Put API keys here\n", "utf8");
-    }
-  }
+export function loadActiveConfigRaw(cwd: string = process.cwd()): {
+  config: WebConfig;
+  paths: AppPaths;
+  scope: "project" | "global";
+} {
+  const paths = getAppPaths(APP_NAME, cwd);
+  ensureBootstrapped(paths);
+  const active = paths.projectConfig ?? paths.globalConfig;
+  const scope: "project" | "global" = paths.projectConfig ? "project" : "global";
   let raw: unknown;
   try {
-    raw = JSON.parse(fs.readFileSync(paths.globalConfig, "utf8"));
+    raw = JSON.parse(fs.readFileSync(active, "utf8"));
   } catch (error) {
     throw new AppError(
-      `Failed to parse ${paths.globalConfig}: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to parse ${active}: ${error instanceof Error ? error.message : String(error)}`,
       "CONFIG_PARSE_ERROR",
     );
   }
-  return { config: webConfigValidator.validate(raw), paths };
+  return { config: webConfigValidator.validate(raw), paths, scope };
 }
 
-/** Atomically writes `config` to the global `~/.web/config.json`. */
-export function saveGlobalWebConfig(config: WebConfig, paths?: AppPaths): void {
+/** Atomically writes `config` to the active config path (project when present). */
+export function saveActiveConfig(config: WebConfig, paths?: AppPaths): void {
   const resolvedPaths = paths ?? getAppPaths(APP_NAME);
-  fs.mkdirSync(resolvedPaths.globalRoot, { recursive: true });
-  const tmp = `${resolvedPaths.globalConfig}.tmp`;
+  const target = resolvedPaths.projectConfig ?? resolvedPaths.globalConfig;
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const tmp = `${target}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(config, null, 2), "utf8");
-  fs.renameSync(tmp, resolvedPaths.globalConfig);
+  fs.renameSync(tmp, target);
 }
 
 /** Upserts an account entry in a fresh copy of `config`; returns the copy. */
@@ -77,8 +105,7 @@ export function setAccount(
 ): WebConfig {
   requireSegment(segment);
   const next = structuredClone(config);
-  ensureSegment(next, segment);
-  next[segment].account[alias] = account;
+  ensureSegment(next, segment).account[alias] = account;
   return next;
 }
 
@@ -86,8 +113,7 @@ export function setAccount(
 export function removeAccount(config: WebConfig, segment: SegmentName, alias: string): WebConfig {
   requireSegment(segment);
   const next = structuredClone(config);
-  ensureSegment(next, segment);
-  delete next[segment].account[alias];
+  delete ensureSegment(next, segment).account[alias];
   return next;
 }
 
@@ -126,11 +152,13 @@ function requireSegment(segment: string): asserts segment is SegmentName {
   }
 }
 
-function ensureSegment(config: WebConfig, segment: SegmentName): void {
+function ensureSegment(config: WebConfig, segment: SegmentName): SegmentConfig {
   if (!config[segment]) {
-    (config as unknown as Record<string, unknown>)[segment] = { account: {} };
+    config[segment] = { account: {} };
   }
-  if (!config[segment].account) {
-    config[segment].account = {};
+  const seg = config[segment]!;
+  if (!seg.account) {
+    seg.account = {};
   }
+  return seg;
 }

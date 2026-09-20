@@ -20,6 +20,11 @@ export interface AppPaths {
    * otherwise the global `.web/logs`.
    */
   logsDir: string;
+  /**
+   * Effective account-cooldown file (`locks.json`): project-scoped when a
+   * project root exists, otherwise under the global root.
+   */
+  lockFile: string;
 }
 
 /**
@@ -50,6 +55,7 @@ export function getAppPaths(appName: string, cwd: string = process.cwd()): AppPa
     projectEnv: projectRootResolved ? path.join(projectRootResolved, ".env") : undefined,
     projectPlugins: projectRootResolved ? path.join(projectRootResolved, "plugins") : undefined,
     logsDir,
+    lockFile: path.join(projectRootResolved ?? globalRoot, "locks.json"),
   };
 }
 

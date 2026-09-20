@@ -1,8 +1,8 @@
-import type { ProviderBinding, ProviderHooks, TransportRequest } from "../../core";
-import type { FetchRequest, ProviderResponse, SearchRequest } from "../protocol/types";
-import { filterVendorParams } from "../protocol/vendor-params";
-import { bearer, ensureSuccess, parseJsonBody, resolveBaseUrl } from "./_http";
-import { makeInstance } from "./_factory";
+import type { PluginHost, ProviderBinding, ProviderHooks, TransportRequest } from "../../../core";
+import type { FetchRequest, ProviderResponse, SearchRequest } from "../../protocol/types";
+import { filterVendorParams } from "../../protocol/vendor-params";
+import { bearer, ensureSuccess, parseJsonBody, resolveBaseUrl } from "./shared";
+import { makeFactory, makeInstance } from "./factory";
 
 const DEFAULT_BASE = "https://api.firecrawl.dev";
 const SEARCH_VENDOR_ALLOWLIST = ["tbs", "location", "categories", "safe", "scrapeOptions", "ignoreInvalidURLs", "highlights"] as const;
@@ -99,4 +99,11 @@ export function createFirecrawlFetch(binding: ProviderBinding) {
     },
   };
   return makeInstance(binding, hooks);
+}
+
+export function activate(host: PluginHost): void {
+  host.registerFactory("firecrawl", makeFactory(["search", "fetch"], {
+    search: createFirecrawlSearch,
+    fetch: createFirecrawlFetch,
+  }));
 }

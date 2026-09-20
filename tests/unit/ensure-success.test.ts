@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ProviderError } from "../../src/core";
-import { ensureSuccess } from "../../src/web/providers/_http";
+import { ensureSuccess } from "../../src/web/plugins/builtin/shared";
 import type { TransportResult } from "../../src/core";
 
 function result(statusCode: number, bodyText: string): TransportResult {

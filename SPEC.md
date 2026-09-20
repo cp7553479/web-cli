@@ -6,17 +6,21 @@
 
 ## 1. Goal
 
-One local CLI, `web`, that turns web **search** and web **fetch** into reusable,
-agent-friendly infrastructure. The CLI is built on a **portable abstraction
-layer (`src/core/`)** so the same architecture can be lifted into other domains
-(e.g. image generation) without rewriting the plumbing.
+One local CLI, `web`, that turns web **search**, web **fetch**, and web
+**image search** into reusable,
+agent-friendly infrastructure, built on a portable abstraction layer
+(`src/core/`).
 
-v1 public commands:
+Public commands:
 
 - `web search <query>`
 - `web fetch <url...>`
+- `web search-image <query>`
+- `web ask <question> [--model provider/model]`
 - `web config <subcommand>`
 - `web provider <subcommand>`
+- `web doctor [--fix]`
+- `web update`
 
 ## 2. Design Principles
 
@@ -29,15 +33,16 @@ v1 public commands:
    classified and the pool pointer moves only on classifications that justify
    it (see §10).
 4. **core is portable.** `src/core/**` has zero upward dependencies. It never
-   imports from `src/web/**`. Porting to another domain = copying `src/core/`.
+   imports from `src/web/**`.
 5. **Minimal dependencies.** Prefer Node built-ins + `curl` over libraries.
    Libraries are admitted only when a built-in cannot do the job
    (`commander` = CLI, `linkedom` = DOM for html2markdown, `playwright` =
-   optional browser fetch).
+   browser fetch).
 6. **Agent-friendly output.** Default output is bounded and structured.
    Secrets, raw requests, and raw responses never reach default stdout.
-7. **Config is data.** Configuration lives in JSON files under `~/.web`
-   (project-overridable). Keys may be inline or `{$ENV}` references.
+7. **Config is data.** The active configuration is `./.web/config.json` when
+   present, else `~/.web/config.json` (auto-initialized on first run). Keys
+   may be inline or `{$ENV}` references.
 
 ## 3. CLI Grammar
 
@@ -48,27 +53,32 @@ web <command> [options]
 
 web search <query> [options]
 web fetch <url...> [options]
+web search-image <query> [options]
+web ask <question> [--model provider/model] [options]
 
 web config init [--force]
+web config add <group> <alias> --provider <p> [--token <t>] [--field <k=v>]...
 web config path
 web config show [--json]
 web config list
 web config set <group> <alias> --provider <p> [--token <t>] [--base-url <u>] [--enabled <bool>]
 web remove <group> <alias>            (alias: web config remove-model)
 web config use <group> <alias>
-web config doctor [--json]
 
 web provider list [--json]
 web provider <provider-id> models [--json]
+
+web doctor [--json] [--fix]
+web update [--check]
 ```
 
-### 3.1 Global flags (apply to `search` and `fetch`)
+### 3.1 Global flags (apply to `search`, `fetch`, `search-image` and `ask`)
 
 | Flag | Values | Default | Notes |
 |---|---|---|---|
-| `-f, --format` | `json` \| `markdown` \| `text` | `text` | output format |
-| `--max-length <n>` | positive int | `10000` | hard char cap on rendered output |
-| `--timeout-ms <n>` | positive int | `15000` | per-request timeout (curl `--max-time`) |
+| `-f, --format` | `json` \| `markdown` \| `text` | `markdown` | output format |
+| `--max-length <n>` | positive int | `50000` | when rendered output is longer, the COMPLETE record is written to a file (`./.web/temp/` when the project has a `.web` directory, else `~/.web/temp/`) and stdout prints the file path |
+| `--timeout-ms <n>` | positive int | `30000` | per-request timeout (curl `--max-time`) |
 
 ### 3.2 `web search`
 
@@ -85,11 +95,13 @@ web search <query>
   [--vendor <key=value>...]       # provider-native params (allowlist-filtered)
 ```
 
-- Without `--provider`/`--account`, accounts under `[search]` are tried in
-  declared order (failover). The active default account from `current.json`
-  (see §7) is tried first when set.
+- Without `--provider`/`--account`, accounts under `[search]` are tried in the
+  segment's provider fallback order (`providers.primary` → `providers.list` →
+  the rest), with account-level failover inside each provider group and
+  cooldown-based queueing (see §7.3). The active default account from
+  `current.json` (see §7) is tried first when set.
 - `--provider <name>` resolves to either an account alias or all accounts of a
-  provider type, in declared order.
+  provider type, in fallback order.
 - Unknown trailing `--key value` / `--key=value` are merged into vendor params
   (explicit `--vendor` wins on key collision); only allowlisted keys reach the
   provider API.
@@ -105,15 +117,63 @@ web fetch <url...>
 ```
 
 - Same failover/`--account` semantics as `search`, over `[fetch]` accounts.
-- When rendered output exceeds the fetch char limit (`100_000`), it is written
-  to `./.web/temp/<timestamp>.md` and stdout prints the file path.
+- **Playwright fallback:** when no fetch accounts are configured, or every
+  configured fetch account fails (timeout, quota, auth, …), the page is
+  fetched through the playwright plugin (headless by default; an account may
+  set `headless: "false"` via its config schema) and the rendered page is
+  cleaned to readable Markdown. Pinning a non-playwright provider/account
+  disables the fallback — the error propagates. Oversized-output spill
+  (`--max-length`, see §3.1) applies to `fetch` and `search` alike.
 
-### 3.4 `web config`
+### 3.4 `web search-image`
 
-- `init` — non-interactively copy the `init/` template (`config.json`,
-  `.env.example`, skills) into `~/.web`. `--force` overwrites an existing
-  `config.json`. Also syncs the bundled skill to existing agent skill
-  directories on the machine.
+```
+web search-image <query>
+  [--limit <n>]                   # result count (default 10)
+  [--provider <aliasOrName>]      # pin one account alias or provider type
+  [--account <alias>]             # pin one account id
+  [--vendor <key=value>...]       # provider-native params (allowlist-filtered)
+```
+
+- Runs over the `[images]` segment: same failover/locks/provider-order
+  semantics as `search` (`images.providers.primary` / `list`, accounts per
+  provider).
+- Output: Markdown embeds `![alt](image-url)` (json/text also available);
+  oversized output spills per §3.1.
+
+### 3.5 `web ask`
+
+```
+web ask <question>
+  [--model provider/model]        # liteLLM-style id; provider part routes the pool
+  [--provider <aliasOrName>]      # pin one account alias or provider type
+  [--account <alias>]             # pin one account id
+  [--vendor <key=value>...]       # merged into the request body (provider-native)
+```
+
+- Runs over the `[ask]` segment: same failover/locks/provider-order semantics
+  as the other segments.
+- Each vendor plugin injects its own web-search tool (`web_search`,
+  `google_search`, `$web_search`, search plugins, …) plus a fixed English
+  instruction: answer from live web search, cite sources inline as `[N]`, and
+  end with a `Sources:` list in the form `[N] <title> - <URL>`.
+- Default model per account is the account's `model` field; the plugin also
+  carries a vendor default. `--model provider/model` overrides both and
+  routes to that provider's accounts.
+- Vendors without a web-search tool (DeepSeek, MiniMax) still answer, without
+  live citations. XAI deprecated server-side live search (410); grok answers
+  without it today.
+
+### 3.6 `web config`
+
+- `init` — non-interactively write the default `config.json` and `.env` into
+  `~/.web` and install the bundled agent skills (see §6.1 load rule 3).
+  `--force` overwrites an existing `config.json` and installed skill files.
+- `add <group> <alias> --provider <p>` — add an account guided by the
+  provider's config schema (§12): in a TTY, `options` render numbered menus
+  (nested levels open on pick) and other fields prompt free-text; in
+  scripts/agents `--field <k=value>` pre-answers prompts. Answered values are
+  written flat onto the account entry; unanswered fields are omitted.
 - `path` — print resolved config / current / logs paths.
 - `show [--json]` — sanitized resolved config (keys masked). `--json` emits raw
   JSON.
@@ -122,16 +182,37 @@ web fetch <url...>
 - `remove <group> <alias>` — delete an account entry.
 - `use <group> <alias>` — write the active default account for a group into
   `current.json` (see §7).
-- `doctor [--json]` — self-check: config exists & parses, every account's
-  provider has a registered factory, curl is on PATH, `{$ENV}` references
-  resolve. Reports problems; non-zero exit if any hard failure.
 
-### 3.5 `web provider`
+### 3.7 `web doctor`
+
+- Self-check: config exists & parses, every account's provider has a
+  registered factory, curl is on PATH, `{$ENV}` references resolve against the
+  layered env.
+- `--fix` repairs what is safe: create missing `config.json` / `.env`
+  (defaults), reset a corrupt `current.json` to `{}`. Everything else is
+  report-only.
+- Exit code: non-zero when config fails to load, curl is missing, or an
+  account references an unknown provider; unresolved `{$ENV}` is a warning
+  (exit 0).
+- `--json` emits the raw report (including the `fixed` list).
+
+### 3.8 `web update`
+
+- Resolves the latest published version via `npm view @cp7553479/web-cli
+  version`; if newer than the running version, runs
+  `npm install -g @cp7553479/web-cli@latest`.
+- `--check` only reports (`update available: <cur> -> <new>`) without
+  installing.
+- npm missing, registry unreachable, or install failure → concise error,
+  non-zero exit.
+
+### 3.9 `web provider`
 
 - `list [--json]` — list built-in + plugin provider ids, aliases, default base
-  URL, declared capabilities.
+  URL, declared capabilities; shows `enabled=false` for providers turned off
+  via `providers.<name>.enabled`.
 - `<provider-id> models [--json]` — list known models for a provider (built-in
-  list; no live discovery in v1).
+  list; no live discovery).
 
 ## 4. Request / Response Model
 
@@ -152,6 +233,18 @@ interface FetchRequest {
   urls: string[];
   selector?: string;
   waitUntil?: "load" | "domcontentloaded" | "networkidle";
+  vendorParams?: Record<string, unknown>;
+}
+
+interface ImageSearchRequest {
+  query: string;
+  limit: number;
+  vendorParams?: Record<string, unknown>;
+}
+
+interface AskRequest {
+  question: string;
+  model?: string;
   vendorParams?: Record<string, unknown>;
 }
 
@@ -178,29 +271,59 @@ parsing, and failure classification. Validation completes **before** transport.
 
 ## 5. Provider Capability Model
 
-Two orthogonal capability segments: **`search`** and **`fetch`**. Each account
-is declared under exactly one segment. A provider factory may implement either
-or both segments; an account is only materialized for a segment if its
-provider factory implements that segment.
+Three orthogonal capability segments: **`search`**, **`fetch`** and
+**`images`**. Each account is declared under exactly one segment. A provider
+factory may implement any of them; an account is only materialized for a
+segment if its provider factory implements that segment.
 
-Provider × capability matrix (v1):
+Provider × capability matrix:
 
-| Provider   | search | fetch | Notes |
-|------------|:------:|:-----:|-------|
-| brave      |   ✓    |       | `X-Subscription-Token` |
-| tavily     |   ✓    |   ✓   | search `/search` + extract `/extract` |
-| jina       |   ✓    |   ✓   | `s.jina.ai` (search) + `r.jina.ai` (reader) |
-| firecrawl  |   ✓    |   ✓   | **v2** `/v2/search` + `/v2/scrape` |
-| perplexity |   ✓    |       | `/v1/sonar`; returns grounded answer + `search_results[]` |
-| http       |        |   ✓   | raw curl GET, returns body |
-| html2markdown |     |   ✓   | curl GET → Readability → turndown |
-| playwright |        |   ✓   | optional dep; only way to render SPAs |
+| Provider   | search | fetch | images | Notes |
+|------------|:------:|:-----:|:------:|-------|
+| brave      |   ✓    |       |        | `X-Subscription-Token` |
+| tavily     |   ✓    |   ✓   |        | search `/search` + extract `/extract` |
+| jina       |   ✓    |   ✓   |        | `s.jina.ai` (search) + `r.jina.ai` (reader) |
+| firecrawl  |   ✓    |   ✓   |        | **v2** `/v2/search` + `/v2/scrape` |
+| perplexity |   ✓    |       |        | `/v1/sonar`; returns grounded answer + `search_results[]` |
+| exa        |   ✓    |       |        | `POST /search`, `x-api-key`; `includeDomains`/`startPublishedDate` |
+| serper     |   ✓    |       |   ✓    | `X-API-KEY`; web `POST /search` + images `POST /images` |
+| searxng    |   ✓    |       |        | self-hosted; `GET {base_url}/search?format=json` (base_url required) |
+| pixabay    |        |       |   ✓    | `GET /api/?key=…` (free key); `hits[]` → `largeImageURL`/`tags` |
+| pexels     |        |       |   ✓    | `GET /v1/search`, `Authorization` (free key); `photos[]` → `src`/`alt` |
+| http       |        |   ✓   |        | raw curl GET, returns body |
+| html2markdown |     |   ✓   |        | curl GET → Readability → turndown |
+| playwright |        |   ✓   |        | browser-driven; the only way to render SPAs; default fetch fallback (headless configurable) |
 
-Not supported in v1 (and why):
+Ask (LLM) vendors — all `ask`-capable; each injects its own web-search tool
+plus the fixed citation instruction. Plans (agent-plan / coding-plan /
+token-plan) are the same vendor reached through a different account
+`base_url` + `model`:
+
+| Vendor     | Protocol         | Default base | Default model | Web tool |
+|------------|------------------|--------------|---------------|----------|
+| chatgpt    | OpenAI Responses | api.openai.com/v1 | gpt-5-mini | web_search |
+| gemini     | Gemini | generativelanguage.googleapis.com/v1beta | gemini-flash-latest | google_search |
+| claude     | Anthropic | api.anthropic.com | claude-haiku-4-5 | web_search_20250305 |
+| grok       | OpenAI Chat | api.x.ai/v1 | grok-4-fast | — (xAI deprecated live search) |
+| deepseek   | OpenAI Chat | api.deepseek.com | deepseek-chat | — |
+| kimi       | OpenAI Chat | api.moonshot.cn/v1 | kimi-k3 | builtin_function $web_search |
+| volcengine | OpenAI Chat | ark.cn-beijing.volces.com/api/v3 (plan: /api/plan/v3) | doubao-seed-1-6-flash-250615 | web_search |
+| bailian    | OpenAI Chat | dashscope compatible-mode (or dedicated maas base) | qwen-flash | enable_search |
+| minimax    | OpenAI Chat | api.minimax.chat/v1 | MiniMax-M2 | — |
+| openrouter | OpenAI Chat | openrouter.ai/api/v1 | moonshotai/kimi-k2.6 | web plugin |
+| zai        | OpenAI Chat | api.z.ai/api/paas/v4 (coding: /api/coding/paas/v4) | glm-4.5-flash | web_search |
+| zhipu      | OpenAI Chat | open.bigmodel.cn/api/paas/v4 | glm-4.6 | web_search |
+
+Model ids follow the liteLLM naming convention; `--model provider/model`
+routes on the provider part and passes the rest to the request.
+
+Not supported (and why):
 
 - **Moonshot/Kimi** — no standalone search API; only grounded chat with
   encrypted payloads. Not a `{title,url,snippet}` source. Revisit if a real
   search endpoint ships.
+- **Bing Web Search** (retired by Microsoft, Aug 2025), **DuckDuckGo** (no
+  official API), **Kagi** (paid consumer subscription required).
 
 ### Verified provider contracts (summary; full detail in `docs/provider-apis.md`)
 
@@ -235,27 +358,40 @@ Not supported in v1 (and why):
 ~/.web/current.json       active-account pointer (runtime state; mutable)
 ~/.web/logs/*.log         runtime logs (when logging enabled)
 ~/.web/plugins/<id>/      external plugins
-./.web/config.json        project overlay (merged onto global)
+./.web/config.json        project scope (wins over global when present)
 ./.web/current.json       project active-account pointer
 ./.web/logs/              project logs (used when ./.web exists)
 ./.web/temp/              large-fetch output spillover
 ```
 
-Merge rules:
+Load rules (fallback order):
 
-1. Parse `~/.web/config.json` (created from `init/` template on first run).
-2. If `./.web/config.json` exists, deep-merge per-segment (`search`/`fetch`):
-   overlay keys win; `account` maps are unioned with overlay entries winning on
-   alias collision. `runtime` is shallow-merged.
-3. Resolve `{$ENV}` tokens in `api_token` against `process.env` →
+1. If `./.web/config.json` exists, the project scope is active and its config
+   is used exclusively (a project is self-contained: its own `config.json`,
+   `current.json`, `.env`, `logs/`, `plugins/`).
+2. Otherwise the global `~/.web/config.json` applies.
+3. If no directory exists at all, any command auto-initializes `~/.web`:
+   default `config.json` + `.env` + agent skills installed to
+   `~/.web/skills/web-cli`, `~/.agents/skills/web-cli`, and the `skills/`
+   dir of every profile under `~/.hermes/profiles/<profile>/` (existing files
+   are never overwritten; `web config init --force` refreshes them). A
+   one-line notice goes to stderr on first-run init.
+4. Resolve `{$ENV}` tokens in the active config against `process.env` →
    `~/.web/.env` → `./.web/.env` (later sources win).
 
 ### 6.2 `config.json` shape
 
 ```json
 {
-  "runtime": { "logging": true },
+  "runtime": { "logging": true, "lock_ttl_ms": 900000, "retry_rounds": 1 },
+  "providers": {
+    "tavily": { "enabled": false }
+  },
   "search": {
+    "providers": {
+      "primary": "tavily",
+      "list": ["brave", "perplexity"]
+    },
     "inject_before": "",
     "inject_after": "",
     "account": {
@@ -277,15 +413,43 @@ Merge rules:
         "enabled": true
       }
     }
+  },
+  "images": {
+    "account": {
+      "pixabay-main": { "provider": "pixabay", "api_token": "{$PIXABAY_KEY}" }
+    }
   }
 }
 ```
 
-- `provider` MUST match a factory registered by built-in or plugin code.
+- `[images]` and `[ask]` mirror the `[search]`/`[fetch]` shape (optional
+  segments; older configs without them keep working) and back
+  `web search-image` / `web ask`.
+
+- `provider` MUST match a factory registered by a plugin (all providers,
+  including built-ins, are plugins — see §12).
 - `api_token` is a literal string OR `{$ENV_VAR}` (resolved at load; missing
   env var is a hard error unless the account is `enabled: false`).
 - `base_url` is optional (provider default applies).
+- Beyond the keys above, accounts may carry provider schema fields (flat
+  strings, e.g. `"model"`); validation passes them through and materialize
+  hands them to the factory via `binding.fields`.
 - `enabled` defaults to `true`; `false` skips materialization.
+- `providers.<name>.enabled: false` disables a provider EVERYWHERE: its
+  accounts are skipped at materialize (`provider-disabled`), and
+  `web provider list` / `web doctor` surface the state (warning, not failure).
+- `[search].providers` / `[fetch].providers` set the per-segment fallback
+  order: `primary` is the default provider (tried first), `list` orders the
+  remaining fallback providers; unlisted providers follow in first-appearance
+  order. Accounts are grouped by this order (declared order within a group).
+- `runtime.lock_ttl_ms` — cooldown for an account after a failure.
+  Default `900000` (15 minutes). The cooldown is persisted to
+  `<active-.web>/locks.json` and survives across invocations.
+- `runtime.retry_rounds` — how many full passes over the account queue before
+  `*_ALL_FAILED`. Default `1`: each account is tried at most once per
+  invocation. Values > 1 re-walk the queue (locked accounts last,
+  earliest-locked first). These two are config-only — there are no CLI flags
+  for them.
 - `inject_before` / `inject_after` wrap the rendered output (used to inject
   system-prompt context for agent callers).
 
@@ -359,24 +523,44 @@ interface ProviderInstance<Req, Res> {
 ```ts
 class ProviderPool<Req, Res> {
   run(req: Req, opts): Promise<ProviderResponse>
-  // opts: { forcedAccount?, forcedProvider?, resolver, segment }
+  // opts: { forcedAccount?, forcedProvider?, segment }
 }
 ```
 
+Candidate queueing (automatic runs, no `--provider`/`--account`):
+
+1. Accounts are grouped by provider in the segment's fallback order:
+   `providers.primary` first, then `providers.list`, then the remaining
+   providers in first-appearance order; declared order within each provider.
+2. The preferred account from `current.json` (see §6.3) moves to the front.
+3. Accounts in cooldown (see below) are moved to the back of the queue,
+   ordered by earliest lock expiry — they are retried only after every
+   unlocked account has failed.
+
 Dispatch algorithm (failover):
 
-1. Resolve ordered candidate instances for the segment from
-   `current.json` + config + `opts`.
-2. For each instance in order:
+1. Walk the queue top to bottom. Per instance:
    1. `hooks.buildRequest(req)` → `TransportRequest`
    2. `transport.execute(...)` → `TransportResult`
-   3. `hooks.parseResponse(...)` → `ProviderResponse`; return on success.
-   4. On throw: `hooks.classifyFailure(error)` → `FailureClass`. Log
-      `(id, class)`. If `non-retryable-request` → re-throw. Else continue.
-3. If none succeeded: throw `AppError("<SEGMENT>_ALL_FAILED")`.
+   3. `hooks.parseResponse(...)` → `ProviderResponse`; on success the
+      account's lock (if any) is cleared and the result is returned.
+   2. On throw: `hooks.classifyFailure(error)` → `FailureClass`, logged
+      `(id, class)`; the account is **locked** (cooldown persisted to
+      `<active-.web>/locks.json`, default 15 min, `runtime.lock_ttl_ms`)
+      and the walk continues. Rotation is unconditional — the class is
+      diagnostic, it does not gate rotation.
+2. The walk is repeated `runtime.retry_rounds` times (default 1 — every
+   account is tried at most once per invocation, so the loop always
+   terminates). Between rounds the lock file is re-read and the queue is
+   re-ordered locked-last / earliest-locked-first.
+3. If nothing succeeded after all rounds: `AppError("<SEGMENT>_ALL_FAILED")`
+   with the per-account attempt trail.
 
-> Multi-provider concurrent merge (`--providers`) is intentionally **not** in
-> v1. Failover + `--provider`/`--account` selection covers the use cases.
+`--provider` / `--account` pin a run: the lock file is neither read nor
+written, and the candidate list is exactly the pinned selection.
+
+> Multi-provider concurrent merge (`--providers`) is intentionally **not**
+> supported. Failover + `--provider`/`--account` selection covers the use cases.
 
 ## 8. Transport Layer
 
@@ -407,13 +591,14 @@ browser directly); all others go through `curl`.
 
 ## 9. Output
 
-`render(response, format, maxLength, injectBefore, injectAfter)`:
+`render(response, format, injectBefore, injectAfter)` produces the full output:
 
 - `json` → `{ items, raw? }` pretty JSON
 - `markdown` → per-item `## N. title` + URL/snippet/content
 - `text` → per-item `[N] title` + url/snippet/content
-- Wrap with `injectBefore` / `injectAfter`, then hard-cut at `maxLength`
-  (`...[truncated]` suffix).
+- Wrapped with `injectBefore` / `injectAfter`; `emitResult` then either prints
+  it or spills the complete record to a file when it exceeds `--max-length`
+  (see §3.1).
 
 Secrets and raw provider payloads never appear in default stdout. Diagnostics
 go to logs or (for fetch) the temp file.
@@ -424,7 +609,7 @@ go to logs or (for fetch) the temp file.
   `[ts] label\n<body>\n\n` entries to `<effective-.web>/logs/<date>-<id>.log`.
 - Logged: CLI command + args, http.request (masked auth), http.response
   (status + body), pool attempt `(id, FailureClass)`.
-- `web config doctor` is the user-facing diagnostic surface.
+- `web doctor` is the user-facing diagnostic surface.
 
 ## 11. Error Handling
 
@@ -437,25 +622,36 @@ go to logs or (for fetch) the temp file.
 
 ## 12. Plugin Protocol
 
-External providers live under `~/.web/plugins/<id>/`:
+ALL providers are plugins with one contract. Built-ins ship inside the package
+as `WebPlugin` modules (`src/web/plugins/builtin/<name>.ts`, each exporting
+`activate(host)`); external providers live under `~/.web/plugins/<id>/` with a
+`plugin.json` manifest:
 
 ```json
 // ~/.web/plugins/<id>/plugin.json
-{ "id": "acme", "main": "index.cjs", "version": "1.0.0", "runtime": "node" }
+{ "id": "acme", "main": "index.cjs", "version": "1.0.0" }
 ```
 
-- v1 supports `runtime: "node"` (CommonJS, `require`-d **in-process** — same
-  privilege model as built-ins; only install trusted plugins). The plugin's
-  default export is a `WebPlugin { activate(api) }` that calls
-  `api.registerProvider(name, factory)` with the same factory shape as
-  built-ins. Later-loaded plugins override same-named factories (project
-  `./.web/plugins` overrides `~/.web/plugins` overrides built-in).
+- `loadPlugins()` (`src/web/plugins/index.ts`) is the single entry point:
+  built-in plugins activate first, then user plugins, then project plugins —
+  later registrations override same-named factories. There is no separate
+  "built-in registry"; the CLI reaches providers ONLY via the `PluginHost`.
+- Both kinds call `host.registerFactory(name, factory)` with the same factory
+  shape. A factory may declare `config: ProviderConfigField[]` — the provider
+  config schema that drives `web config add` menus; written values are flat
+  account fields handed back via `binding.fields` (see docs/plugin-protocol.md).
+  Only external `runtime: "node"` is supported (CommonJS, `require`-d
+  **in-process** — same privilege model as built-ins; only install trusted
+  plugins).
 - A subprocess runtime (`node`/`python`/`executable` over JSON stdio) is
-  reserved for a future revision; the factory interface already accommodates it.
+  reserved for the future; the factory interface already accommodates it.
+- Disabling: `providers.<name>.enabled: false` in config skips the provider's
+  accounts at materialize; the factory stays registered so
+  `web provider list` can show the state.
 
-## 13. Out of Scope (v1)
+## 13. Out of Scope
 
-- `web research` and `web answer` commands (removed).
+- `web research` and `web answer` commands.
 - Multi-profile config (single `config.json` + `current.json` pointer only).
 - `--providers` concurrent multi-provider merge (failover only).
 - Kimi/Moonshot provider (no real search API).
